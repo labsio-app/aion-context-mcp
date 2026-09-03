@@ -157,6 +157,8 @@ docker compose up -d --build
 ## AI host instructions
 
 Use `prompts/aion-researcher.md` as project/system instructions in the AI host.
+The source corpus lives in [`references/`](references/README.md).
+See also [docs/metier.md](docs/metier.md) for the product and business rules.
 
 The intended responsibility split is:
 
