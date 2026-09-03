@@ -1,0 +1,108 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aion}
+      POSTGRES_USER: ${POSTGRES_USER:-aion_app}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - aion_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aion_app} -d ${POSTGRES_DB:-aion}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  migrate:
+    build: .
+    command: npm run db:migrate
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-aion}
+      PGUSER: ${POSTGRES_USER:-aion_app}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    secrets:
+      - postgres_password
+
+  web:
+    build: .
+    restart: unless-stopped
+    command: node .output/server/index.mjs
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-aion}
+      PGUSER: ${POSTGRES_USER:-aion_app}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
+      NUXT_ADMIN_TOKEN: ${NUXT_ADMIN_TOKEN:-}
+      NITRO_HOST: 0.0.0.0
+      NITRO_PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - postgres_password
+
+  mcp:
+    build: .
+    restart: unless-stopped
+    command: npm run mcp
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-aion}
+      PGUSER: ${POSTGRES_USER:-aion_app}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
+      MCP_OAUTH_ISSUER: ${MCP_OAUTH_ISSUER:-}
+      MCP_OAUTH_RESOURCE: ${MCP_OAUTH_RESOURCE:-}
+      MCP_OAUTH_PASSWORD: ${MCP_OAUTH_PASSWORD:-}
+      MCP_OAUTH_JWT_SECRET: ${MCP_OAUTH_JWT_SECRET:-}
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
+      MCP_PORT: ${MCP_PORT:-3001}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - postgres_password
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: npm run worker
+    environment:
+      PGHOST: db
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB:-aion}
+      PGUSER: ${POSTGRES_USER:-aion_app}
+      PGPASSWORD_FILE: /run/secrets/postgres_password
+      PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
+      WORKER_POLL_MS: ${WORKER_POLL_MS:-3000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    secrets:
+      - postgres_password
+
+volumes:
+  aion_postgres:
+
+secrets:
+  postgres_password:
+    file: /etc/labsio/projects/aion-theorycraft/secrets/postgres_password
