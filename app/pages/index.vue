@@ -94,19 +94,18 @@ onMounted(async () => {
 
     <section id="top" class="hero page-width">
       <div class="hero-copy">
-        <p class="eyebrow">AION 2 · SHARED CONTEXT</p>
-        <h1>Context that stays explicit.</h1>
+        <p class="eyebrow">REMOTE MCP</p>
+        <h1>AION MCP</h1>
         <p class="lede">
-          AION MCP gives compatible clients one clean endpoint to search sources, preserve
-          evidence, and challenge claims without turning the model into a database.
+          Public MCP endpoint for AION context and OAuth access.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="#connect">Connect a client <span>→</span></a>
-          <a class="button quiet" href="#sign-in">Open session</a>
+          <a class="button primary" href="#connect">Copy endpoint <span>→</span></a>
+          <a class="button quiet" href="#sign-in">Sign in</a>
         </div>
         <div class="trust-row">
           <span>OAuth 2.1 + PKCE</span>
-          <span>Traceable sources</span>
+          <span>Browser session</span>
           <span>Release {{ releaseTag }}</span>
         </div>
       </div>
@@ -118,7 +117,7 @@ onMounted(async () => {
           <span class="panel-live">LIVE</span>
         </div>
         <div class="panel-body">
-          <p class="panel-label">MCP SERVER URL</p>
+          <p class="panel-label">ENDPOINT</p>
           <div class="endpoint-value">
             <code>{{ endpoint }}</code>
             <button type="button" class="copy-button" @click="copy(endpoint, 'url')">
@@ -126,13 +125,13 @@ onMounted(async () => {
             </button>
           </div>
           <div class="mini-list">
-            <p><span>01</span> Source-backed answers</p>
-            <p><span>02</span> OAuth session in this browser</p>
-            <p><span>03</span> Release tag as source of truth</p>
+            <p><span>01</span> Add the server URL</p>
+            <p><span>02</span> Sign in in this browser</p>
+            <p><span>03</span> Approve the client</p>
           </div>
           <div class="code-box">
             <div class="code-header">
-              <span>Generic configuration</span>
+              <span>Config</span>
               <button type="button" @click="copy(connectionConfig, 'config')">
                 {{ copied === 'config' ? 'Copied' : 'Copy' }}
               </button>
@@ -145,39 +144,36 @@ onMounted(async () => {
 
     <section id="connect" class="section page-width">
       <div class="section-intro">
-        <p class="eyebrow">HOW IT WORKS</p>
-        <h2>Three steps, no ceremony.</h2>
+        <p class="eyebrow">SETUP</p>
+        <h2>Three steps.</h2>
       </div>
       <div class="steps-grid">
         <article class="step-card">
           <span class="step-number">01</span>
           <h3>Add the server</h3>
-          <p>Paste the remote MCP URL into T3 Code, ChatGPT, or another compatible client.</p>
+          <p>Use the remote MCP URL in a compatible client.</p>
         </article>
         <article class="step-card">
           <span class="step-number">02</span>
           <h3>Approve access</h3>
-          <p>OAuth opens here on first use. Sign in once, then approve the client request.</p>
+          <p>Sign in here to create a browser session for OAuth approval.</p>
         </article>
         <article class="step-card">
           <span class="step-number">03</span>
           <h3>Search first</h3>
-          <p>Ask the client to call <code>aion_search_context</code> before answering.</p>
+          <p>Use the MCP tools exposed by the server.</p>
         </article>
       </div>
     </section>
 
     <section id="sign-in" class="section page-width auth-section">
       <div class="section-intro">
-        <p class="eyebrow">BROWSER SESSION</p>
-        <h2>{{ authenticated ? 'Session ready for approval.' : 'Sign in before approving a client.' }}</h2>
-        <p>
-          This session stays in the browser only and keeps the OAuth flow short when a client
-          redirects back here.
-        </p>
+        <p class="eyebrow">AUTH</p>
+        <h2>{{ authenticated ? 'Authenticated.' : 'Sign in to approve clients.' }}</h2>
+        <p>Browser session only. Required for OAuth redirects.</p>
       </div>
       <form v-if="!authenticated" class="login-form" @submit.prevent="login">
-        <label for="password">Access password</label>
+        <label for="password">Password</label>
         <div class="login-row">
           <input
             id="password"
@@ -185,7 +181,7 @@ onMounted(async () => {
             type="password"
             autocomplete="current-password"
             required
-            placeholder="Your OAuth password"
+            placeholder="Password"
           />
           <button class="button primary" :disabled="busy" type="submit">
             {{ busy ? 'Signing in…' : 'Sign in' }}
@@ -197,7 +193,7 @@ onMounted(async () => {
         <span class="check">✓</span>
         <div>
           <strong>Session active</strong>
-          <p>Return to your client and approve its authorization request.</p>
+          <p>Return to the client and approve the request.</p>
         </div>
         <button type="button" class="text-button" :disabled="busy" @click="logout">Sign out</button>
       </div>
@@ -205,28 +201,50 @@ onMounted(async () => {
 
     <section id="capabilities" class="section page-width">
       <div class="section-intro centered">
-        <p class="eyebrow">WHAT THE AI CAN USE</p>
-        <h2>Small surface, clear behavior.</h2>
-        <p>The model reasons. AION MCP keeps retrieval, evidence, and contradictions explicit.</p>
+        <p class="eyebrow">TOOLS</p>
+        <h2>Exposed MCP tools.</h2>
+        <p>Use the server tools from a compatible client.</p>
       </div>
       <div class="features-grid">
         <article class="feature-card featured">
           <span class="feature-icon">⌕</span>
           <h3>Search context</h3>
           <code>aion_search_context</code>
-          <p>Retrieves stored sources, knowledge, and open contradictions before an answer.</p>
+          <p>Searches stored context before an answer.</p>
         </article>
         <article class="feature-card">
           <span class="feature-icon">⌁</span>
           <h3>Preserve evidence</h3>
           <code>aion_record_source</code>
-          <p>Records links, transcripts, and notes without claiming every source is definitive.</p>
+          <p>Records links, transcripts, and notes.</p>
         </article>
         <article class="feature-card">
           <span class="feature-icon">↯</span>
           <h3>Make doubt visible</h3>
           <code>aion_record_challenge</code>
-          <p>Keeps contradictions and counter-evidence attached instead of erasing them.</p>
+          <p>Stores contradictions and counter-evidence.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="legal" class="section page-width">
+      <div class="section-intro centered">
+        <p class="eyebrow">LEGAL</p>
+        <h2>Independent project.</h2>
+        <p>Short notice for access and distribution.</p>
+      </div>
+      <div class="legal-grid">
+        <article class="legal-card">
+          <h3>Not affiliated</h3>
+          <p>This site is independent and not affiliated with any client vendor.</p>
+        </article>
+        <article class="legal-card">
+          <h3>No sales</h3>
+          <p>No products, subscriptions, or affiliate links are offered here.</p>
+        </article>
+        <article class="legal-card">
+          <h3>Access only</h3>
+          <p>The site exposes the MCP endpoint and browser OAuth session only.</p>
         </article>
       </div>
     </section>
@@ -236,7 +254,7 @@ onMounted(async () => {
         <span class="brand-mark">A</span>
         <span>AION <em>MCP</em></span>
       </a>
-      <span>Context infrastructure for AION 2 · {{ releaseTag }}</span>
+      <span>Independent MCP endpoint · no sales · {{ releaseTag }}</span>
       <a :href="`${endpoint.replace('/mcp', '')}/health`" target="_blank" rel="noreferrer">Server status</a>
     </footer>
   </main>
@@ -590,7 +608,8 @@ h1 {
 }
 
 .steps-grid,
-.features-grid {
+.features-grid,
+.legal-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
@@ -599,6 +618,7 @@ h1 {
 
 .step-card,
 .feature-card,
+.legal-card,
 .login-form,
 .logged-in {
   border: 1px solid rgba(181, 174, 225, 0.14);
@@ -752,6 +772,23 @@ h1 {
   margin-top: 17px;
 }
 
+.legal-card {
+  padding: 24px;
+}
+
+.legal-card h3 {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  color: var(--aion-text);
+}
+
+.legal-card p {
+  color: var(--aion-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
 .footer {
   min-height: 108px;
   display: flex;
@@ -796,7 +833,8 @@ h1 {
   }
 
   .steps-grid,
-  .features-grid {
+  .features-grid,
+  .legal-grid {
     grid-template-columns: 1fr;
   }
 
