@@ -55,6 +55,7 @@ There is no aggregate ceremony, event bus or CQRS in this POC.
 ## MCP tools
 
 - `aion_search_context` — first tool to call for a question.
+- `aion_get_server_info` — inspect the deployed release tag and commit.
 - `aion_get_source` — read a stored source.
 - `aion_record_source` — store source material.
 - `aion_record_knowledge` — store an observation/claim/theory/recommendation.
@@ -107,17 +108,22 @@ curl -s https://aion-mcp.labsio.app/.well-known/oauth-protected-resource
 curl -s https://aion-mcp.labsio.app/.well-known/oauth-authorization-server
 ```
 
-The old bearer-token check is gone. ChatGPT now links through OAuth 2.1 + PKCE.
+The old bearer-token check is gone. Any MCP client that supports OAuth 2.1 + PKCE can connect.
 
-## Connect from ChatGPT
+## Connect from T3 Code or another client
 
-1. Open ChatGPT in a workspace that has Developer mode / Plugins enabled.
-2. Add a new MCP connection with the public URL `https://aion-mcp.labsio.app/mcp`.
-3. When ChatGPT opens the auth flow, it should use the public OAuth metadata from the same domain.
-4. Log in with the password configured in `MCP_OAUTH_PASSWORD`.
-5. After consent, ChatGPT will store the bearer token it received and reuse it on future tool calls.
+1. Point the MCP endpoint to `https://aion-mcp.labsio.app/mcp`.
+2. If the client supports Client ID Metadata Documents, give it a HTTPS `client_id` URL and let it publish its own `redirect_uris`.
+3. If the client uses pre-registration instead, add its redirect URI to `MCP_OAUTH_ALLOWED_REDIRECT_URIS`.
+4. Complete the authorization flow with the password configured in `MCP_OAUTH_PASSWORD`.
 
-If you change tool names, metadata, scopes or auth config, refresh the connection in ChatGPT and start a new conversation.
+Example for a pre-registered client:
+
+```env
+MCP_OAUTH_ALLOWED_REDIRECT_URIS=https://chatgpt.com/connector_platform_oauth_redirect,https://chatgpt.com/connector/oauth/*,http://127.0.0.1:3000/callback
+```
+
+ChatGPT remains supported, but it is no longer the only allowed client.
 
 ## Check MCP manually
 
@@ -153,6 +159,28 @@ Then:
 ```bash
 docker compose up -d --build
 ```
+
+## Automated deploy
+
+The release source of truth is the Git tag, for example `v1.2.3`.
+
+On the VPS, register a self-hosted GitHub Actions runner and let it use the `Deploy` workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+To publish a release from your workstation with `gh`:
+
+```bash
+gh release create v1.2.3 --title v1.2.3 --generate-notes --target main
+```
+
+That tag triggers the deployment workflow, which rebuilds the containers on the VPS.
+
+If you need to redeploy a known tag manually:
+
+```bash
+gh workflow run deploy.yml -f ref=v1.2.3
+```
+
+The active release is visible in the MCP server info tool and in `GET /health`.
 
 ## AI host instructions
 

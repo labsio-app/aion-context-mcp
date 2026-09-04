@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/server'
 import * as z from 'zod/v4'
 import { getContainer } from '../infrastructure/container.js'
+import { getBuildInfo } from '../infrastructure/version.js'
 import {
   confidenceLevels,
   gameScopes,
@@ -32,6 +33,14 @@ function jsonResult(value: unknown) {
   }
 }
 
+function buildInfoResult() {
+  const build = getBuildInfo()
+  return {
+    ...build,
+    nodeEnv: process.env.NODE_ENV ?? 'development'
+  }
+}
+
 const researcherPrompt = `
 You are the reasoning layer for AION 2 research.
 
@@ -50,10 +59,11 @@ Rules:
 
 export function createAionMcpServer() {
   const { knowledge, acquisition } = getContainer()
+  const buildInfo = getBuildInfo()
   const server = new McpServer({
     name: 'aion-context',
     title: 'AION Context',
-    version: '0.1.0',
+    version: buildInfo.version,
     description: 'Context persistence and retrieval for AION 2 research.'
   })
 
@@ -189,6 +199,16 @@ export function createAionMcpServer() {
         }
       ]
     })
+  )
+
+  server.registerTool(
+    'aion_get_server_info',
+    withOAuthSecurity({
+      title: 'Get AION server info',
+      description: 'Inspect the deployed MCP version, release tag and commit metadata.',
+      inputSchema: z.object({})
+    }),
+    async () => jsonResult(buildInfoResult())
   )
 
   return server

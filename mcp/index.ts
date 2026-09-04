@@ -1,6 +1,7 @@
 import { createMcpFastifyApp } from '@modelcontextprotocol/fastify'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { createMcpHandler } from '@modelcontextprotocol/server'
+import { getBuildInfo } from '../infrastructure/version.js'
 import { createAionMcpServer } from './server.js'
 import {
   authenticateMcpRequest,
@@ -59,11 +60,21 @@ const nodeHandler = toNodeHandler(handler, {
   onerror: error => console.error('MCP adapter error', error)
 })
 
+const buildInfo = getBuildInfo()
+
 app.all('/mcp', (request, reply) =>
   nodeHandler(request.raw, reply.raw, request.body)
 )
 
-app.get('/health', async () => ({ ok: true, service: 'aion-context-mcp' }))
+app.get('/health', async () => ({
+  ok: true,
+  service: 'aion-context-mcp',
+  version: buildInfo.version,
+  releaseTag: buildInfo.releaseTag,
+  commitSha: buildInfo.commitSha
+}))
 
 await app.listen({ host, port })
-console.log(`AION MCP listening on http://${host}:${port}/mcp`)
+console.log(
+  `AION MCP listening on http://${host}:${port}/mcp (${buildInfo.releaseTag} ${buildInfo.commitSha ?? 'local'})`
+)

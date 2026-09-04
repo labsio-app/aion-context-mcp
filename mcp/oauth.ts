@@ -52,16 +52,185 @@ function randomToken(bytes = 32): string {
   return base64UrlEncode(randomBytes(bytes))
 }
 
-function safeRedirectUri(value: string): boolean {
+interface RedirectUriRule {
+  mode: 'exact' | 'prefix'
+  value: string
+}
+
+interface ClientMetadataDocument {
+  client_id: string
+  client_name: string
+  redirect_uris: string[]
+}
+
+interface ResolvedClientRegistration {
+  kind: 'client_metadata_document' | 'pre_registered'
+  redirectUriRules: RedirectUriRule[]
+}
+
+const clientMetadataCache = new Map<string, { expiresAt: number; value: ResolvedClientRegistration }>()
+
+export function resetOAuthClientMetadataCache(): void {
+  clientMetadataCache.clear()
+}
+
+function normalizeUrlString(value: string): string | null {
   try {
-    const url = new URL(value)
-    if (url.protocol !== 'https:') return false
-    if (url.hostname !== 'chatgpt.com') return false
-    if (url.pathname === '/connector_platform_oauth_redirect') return true
-    return url.pathname.startsWith('/connector/oauth/')
+    const trimmed = value.trim()
+    if (!trimmed) return null
+
+    const url = new URL(trimmed)
+    if (url.username || url.password) return null
+    return trimmed
   } catch {
-    return false
+    return null
   }
+}
+
+function normalizeClientIdentifierUrl(value: string): string | null {
+  const trimmed = normalizeUrlString(value)
+  if (!trimmed) return null
+
+  const url = new URL(trimmed)
+  if (url.protocol !== 'https:') return null
+  if (!url.pathname || url.pathname === '/') return null
+  if (url.search || url.hash) return null
+  return trimmed
+}
+
+function normalizeRedirectUriRule(value: string): RedirectUriRule | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  if (trimmed.endsWith('*')) {
+    const prefix = normalizeUrlString(trimmed.slice(0, -1))
+    if (!prefix) return null
+    return { mode: 'prefix', value: prefix }
+  }
+
+  const exact = normalizeUrlString(trimmed)
+  if (!exact) return null
+  return { mode: 'exact', value: exact }
+}
+
+function parseRedirectUriRules(raw: string | undefined): RedirectUriRule[] {
+  return (raw ?? '')
+    .split(',')
+    .map(value => normalizeRedirectUriRule(value))
+    .filter((value): value is RedirectUriRule => Boolean(value))
+}
+
+function getPreRegisteredRedirectUriRules(): RedirectUriRule[] {
+  return [
+    { mode: 'exact', value: 'https://chatgpt.com/connector_platform_oauth_redirect' },
+    { mode: 'prefix', value: 'https://chatgpt.com/connector/oauth/' },
+    ...parseRedirectUriRules(process.env.MCP_OAUTH_ALLOWED_REDIRECT_URIS)
+  ]
+}
+
+function matchesRedirectUriRules(redirectUri: string, rules: RedirectUriRule[]): boolean {
+  const trimmed = redirectUri.trim()
+  if (!trimmed) return false
+
+  return rules.some(rule => {
+    if (rule.mode === 'exact') return trimmed === rule.value
+    return trimmed.startsWith(rule.value)
+  })
+}
+
+function cacheTtlMsFromResponse(response: Response): number {
+  const cacheControl = response.headers.get('cache-control') ?? ''
+  const match = cacheControl.match(/max-age=(\d+)/i)
+  if (!match) return 5 * 60 * 1000
+
+  const maxAgeSeconds = Number(match[1])
+  if (!Number.isFinite(maxAgeSeconds) || maxAgeSeconds <= 0) return 0
+  return Math.min(maxAgeSeconds * 1000, 30 * 60 * 1000)
+}
+
+async function fetchClientMetadataDocument(clientId: string): Promise<ResolvedClientRegistration | null> {
+  const cached = clientMetadataCache.get(clientId)
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.value
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+  try {
+    const response = await fetch(clientId, {
+      method: 'GET',
+      redirect: 'error',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json'
+      }
+    })
+
+    if (!response.ok) return null
+
+    const payload: unknown = await response.json()
+    const doc = parseClientMetadataDocument(payload, clientId)
+    if (!doc) return null
+
+    const registration: ResolvedClientRegistration = {
+      kind: 'client_metadata_document',
+      redirectUriRules: doc.redirect_uris.map(value => ({ mode: 'exact', value: value.trim() }))
+    }
+
+    const ttlMs = cacheTtlMsFromResponse(response)
+    if (ttlMs > 0) {
+      clientMetadataCache.set(clientId, { expiresAt: Date.now() + ttlMs, value: registration })
+    }
+
+    return registration
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function parseClientMetadataDocument(payload: unknown, expectedClientId: string): ClientMetadataDocument | null {
+  if (!payload || typeof payload !== 'object') return null
+
+  const record = payload as Record<string, unknown>
+  const clientId = typeof record.client_id === 'string' ? record.client_id.trim() : null
+  const clientName = typeof record.client_name === 'string' ? record.client_name.trim() : ''
+  const redirectUris = Array.isArray(record.redirect_uris)
+    ? record.redirect_uris.filter((value): value is string => typeof value === 'string').map(value => value.trim()).filter(Boolean)
+    : []
+
+  if (!clientId || clientId !== expectedClientId) return null
+  if (!clientName) return null
+  if (!redirectUris.length) return null
+
+  return {
+    client_id: clientId,
+    client_name: clientName,
+    redirect_uris: redirectUris
+  }
+}
+
+async function resolveClientRegistration(clientId: string): Promise<ResolvedClientRegistration | null> {
+  const clientIdentifierUrl = normalizeClientIdentifierUrl(clientId)
+  if (clientIdentifierUrl) {
+    return fetchClientMetadataDocument(clientIdentifierUrl)
+  }
+
+  const preRegisteredRules = getPreRegisteredRedirectUriRules()
+  if (!preRegisteredRules.length) return null
+
+  return {
+    kind: 'pre_registered',
+    redirectUriRules: preRegisteredRules
+  }
+}
+
+async function isRedirectUriAllowedForClient(clientId: string, redirectUri: string): Promise<boolean> {
+  const registration = await resolveClientRegistration(clientId)
+  if (!registration) return false
+
+  return matchesRedirectUriRules(redirectUri, registration.redirectUriRules)
 }
 
 interface AuthCodeRecord {
@@ -302,7 +471,7 @@ function renderAuthorizeForm(params: URLSearchParams, error?: string) {
 <body>
   <main>
     <h1>AION MCP authorization</h1>
-    <p>Authorize ChatGPT to use the AION context server.</p>
+    <p>Authorize this MCP client to use the AION context server.</p>
     ${error ? `<div class="error">${esc(error)}</div>` : ''}
     <div class="meta">
       <div><strong>Client</strong>: <code>${field('client_id')}</code></div>
@@ -325,9 +494,10 @@ function renderAuthorizeForm(params: URLSearchParams, error?: string) {
 </html>`
 }
 
-function redirectWithError(params: URLSearchParams, error: string, description: string) {
+async function redirectWithError(params: URLSearchParams, error: string, description: string) {
   const redirectUri = params.get('redirect_uri') ?? ''
-  if (!safeRedirectUri(redirectUri)) {
+  const clientId = params.get('client_id') ?? ''
+  if (!clientId || !(await isRedirectUriAllowedForClient(clientId, redirectUri))) {
     return null
   }
 
@@ -352,7 +522,7 @@ function parseBodyForm(body: any): Record<string, string> {
   return result
 }
 
-function validateAuthorizationRequest(body: Record<string, string>): AuthorizationValidation {
+export async function validateAuthorizationRequest(body: Record<string, string>): Promise<AuthorizationValidation> {
   const responseType = body.response_type?.trim()
   const clientId = body.client_id?.trim()
   const redirectUri = body.redirect_uri?.trim()
@@ -368,7 +538,7 @@ function validateAuthorizationRequest(body: Record<string, string>): Authorizati
   if (!clientId) {
     return { error: 'invalid_request', description: 'client_id is required' }
   }
-  if (!safeRedirectUri(redirectUri ?? '')) {
+  if (!(await isRedirectUriAllowedForClient(clientId, redirectUri ?? ''))) {
     return { error: 'invalid_request', description: 'redirect_uri is not allowed' }
   }
   if (!codeChallenge) {
@@ -433,11 +603,11 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
 
   app.get('/oauth/authorize', async (request, reply) => {
     const query = new URLSearchParams(request.url.split('?')[1] ?? '')
-    const validation = validateAuthorizationRequest(Object.fromEntries(query.entries()))
+    const validation = await validateAuthorizationRequest(Object.fromEntries(query.entries()))
     if ('error' in validation) {
-      const redirect = redirectWithError(query, validation.error, validation.description)
+      const redirect = await redirectWithError(query, validation.error, validation.description)
       if (redirect) {
-      return reply.redirect(redirect, 302)
+        return reply.redirect(redirect, 302)
       }
       return reply.status(400).type('text/html').send(renderAuthorizeForm(query, validation.description))
     }
@@ -448,9 +618,9 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
   app.post('/oauth/authorize', async (request, reply) => {
     const body = parseBodyForm(request.body)
     const query = new URLSearchParams(body)
-    const validation = validateAuthorizationRequest(body)
+    const validation = await validateAuthorizationRequest(body)
     if ('error' in validation) {
-      const redirect = redirectWithError(query, validation.error, validation.description)
+      const redirect = await redirectWithError(query, validation.error, validation.description)
       if (redirect) {
         return reply.redirect(redirect, 302)
       }

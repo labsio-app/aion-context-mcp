@@ -1,0 +1,89 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git tag to deploy'
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aion-context-mcp-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run tests
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    needs: verify
+    runs-on: self-hosted
+    steps:
+      - name: Checkout release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Derive release metadata
+        run: |
+          set -euo pipefail
+          REF_NAME="${GITHUB_REF_NAME}"
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            REF_NAME="${{ inputs.ref }}"
+          fi
+
+          if [[ "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?)$ ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            echo "Deploy only accepts semver tags such as v1.2.3" >&2
+            exit 1
+          fi
+
+          echo "APP_RELEASE_TAG=$REF_NAME" >> "$GITHUB_ENV"
+          echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "APP_COMMIT_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+
+      - name: Build and restart
+        run: docker compose up -d --build --remove-orphans
+
+      - name: Wait for health
+        run: |
+          set -euo pipefail
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3001/health >/tmp/aion-health.json; then
+              cat /tmp/aion-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Health check failed" >&2
+          exit 1

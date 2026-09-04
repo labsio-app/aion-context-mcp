@@ -7,7 +7,7 @@ Date: 2026-09-04
 Le projet AION Context MCP est déjà déployé sur le VPS, avec:
 
 - `aion-mcp.labsio.app` branché sur le MCP public
-- auth OAuth réelle pour ChatGPT
+- auth OAuth réelle pour MCP clients externes
 - dépôt GitHub public créé
 - corpus métier ajouté dans `references/`
 - synthèse métier dans `docs/metier.md`
@@ -59,4 +59,3 @@ Quand tu reprends:
 - commence par relire la spec RAG
 - puis décide du contrat de données avant l’implémentation
 - évite de choisir trop tôt une techno d’indexation
-

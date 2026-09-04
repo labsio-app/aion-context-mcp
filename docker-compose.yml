@@ -70,6 +70,8 @@ services:
       MCP_OAUTH_RESOURCE: ${MCP_OAUTH_RESOURCE:-}
       MCP_OAUTH_PASSWORD: ${MCP_OAUTH_PASSWORD:-}
       MCP_OAUTH_JWT_SECRET: ${MCP_OAUTH_JWT_SECRET:-}
+      APP_RELEASE_TAG: ${APP_RELEASE_TAG:-}
+      APP_COMMIT_SHA: ${APP_COMMIT_SHA:-}
       MCP_HOST: ${MCP_HOST:-0.0.0.0}
       MCP_PORT: ${MCP_PORT:-3001}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
@@ -94,6 +96,8 @@ services:
       PGPASSWORD_FILE: /run/secrets/postgres_password
       PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
       WORKER_POLL_MS: ${WORKER_POLL_MS:-3000}
+      APP_RELEASE_TAG: ${APP_RELEASE_TAG:-}
+      APP_COMMIT_SHA: ${APP_COMMIT_SHA:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
