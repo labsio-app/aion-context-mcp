@@ -1,809 +1,432 @@
 <script setup lang="ts">
-const config = useRuntimeConfig()
+interface BetaSession {
+  authenticated: boolean
+  identity?: {
+    id: string
+    discordUserId: string
+    displayName: string
+  }
+}
 
-const origin = ref('https://aion-mcp.labsio.app')
-const password = ref('')
-const authenticated = ref(false)
-const busy = ref(false)
-const copied = ref('')
+const requestUrl = useRequestURL()
+const session = ref<BetaSession>({ authenticated: false })
+const loading = ref(false)
 const error = ref('')
 
-const endpoint = computed(() => `${origin.value}/mcp`)
-const releaseTag = computed(() => config.public.releaseTag || 'v0.1.0')
-const connectionConfig = computed(() =>
-  JSON.stringify({ mcpServers: { 'aion-context': { url: endpoint.value } } }, null, 2)
-)
+const mcpEndpoint = computed(() => `${requestUrl.origin}/mcp`)
+const betaStartUrl = '/api/beta/discord/start'
 
 async function refreshSession() {
   try {
-    const session = await $fetch<{ authenticated: boolean }>('/oauth/session')
-    authenticated.value = session.authenticated
+    session.value = await $fetch<BetaSession>('/api/beta/session')
   } catch {
-    authenticated.value = false
+    session.value = { authenticated: false }
   }
 }
 
-async function login() {
-  if (!password.value || busy.value) return
-  busy.value = true
+async function signOut() {
+  if (loading.value) return
+  loading.value = true
   error.value = ''
   try {
-    const session = await $fetch<{ authenticated: boolean }>('/oauth/session', {
-      method: 'POST',
-      body: { password: password.value }
+    session.value = await $fetch<BetaSession>('/api/beta/session', {
+      method: 'DELETE'
     })
-    authenticated.value = session.authenticated
-    password.value = ''
-  } catch (cause: any) {
-    error.value = cause?.data?.error === 'invalid_credentials'
-      ? 'Incorrect password.'
-      : 'Sign-in is unavailable. Please try again.'
-  } finally {
-    busy.value = false
-  }
-}
-
-async function logout() {
-  busy.value = true
-  error.value = ''
-  try {
-    await $fetch('/oauth/session', { method: 'DELETE' })
-    authenticated.value = false
   } catch {
     error.value = 'Sign-out failed.'
   } finally {
-    busy.value = false
+    loading.value = false
   }
 }
 
-async function copy(value: string, label: string) {
-  try {
-    await navigator.clipboard.writeText(value)
-    copied.value = label
-    window.setTimeout(() => {
-      if (copied.value === label) copied.value = ''
-    }, 1800)
-  } catch {
-    error.value = 'Could not copy automatically. Select the text manually.'
-  }
-}
-
-onMounted(async () => {
-  origin.value = window.location.origin
-  await refreshSession()
-})
+onMounted(refreshSession)
 </script>
 
 <template>
   <main class="landing">
-    <nav class="nav page-width" aria-label="Main navigation">
-      <a class="brand" href="#top" aria-label="AION MCP home">
-        <span class="brand-mark">A</span>
-        <span>AION <em>MCP</em></span>
-      </a>
-      <div class="nav-links">
-        <a href="#install">Install</a>
-        <a href="#sign-in">Sign in</a>
-        <a href="#use">Use</a>
-      </div>
-      <a class="nav-status" href="#sign-in">
-        <span class="status-dot" :class="{ active: authenticated }" />
-        {{ authenticated ? 'Session active' : 'Protected access' }}
-      </a>
-    </nav>
+    <section class="surface">
+      <header class="header">
+        <div class="brand">
+          <span class="brand-mark">A</span>
+          <div>
+            <p>AION Context MCP</p>
+            <span>Private Beta</span>
+          </div>
+        </div>
+        <p class="header-note">Discord identity only</p>
+      </header>
 
-    <section id="top" class="hero page-width">
-      <div class="hero-copy">
-        <p class="eyebrow">REMOTE MCP</p>
-        <h1>AION MCP</h1>
-        <p class="lede">
-          Technical endpoint for MCP clients and browser-based OAuth access.
-        </p>
-        <div class="hero-actions">
-          <a class="button primary" href="#install">Install notes <span>→</span></a>
-          <a class="button quiet" href="#sign-in">Sign in</a>
-        </div>
-        <div class="trust-row">
-          <span>OAuth 2.1 + PKCE</span>
-          <span>Browser session</span>
-          <span>Release {{ releaseTag }}</span>
-        </div>
-      </div>
+      <div class="hero">
+        <div class="copy">
+          <p class="eyebrow">PUBLIC</p>
+          <h1>Connect an AI client to persistent AION context.</h1>
+          <p class="lede">
+            Access is manual and limited. Discord is used to identify beta applicants, not to
+            authenticate the MCP protocol.
+          </p>
 
-      <aside class="hero-panel" aria-label="MCP endpoint preview">
-        <div class="panel-top">
-          <span class="terminal-dots"><i /><i /><i /></span>
-          <span>AION REMOTE SERVER</span>
-          <span class="panel-live">LIVE</span>
+          <div class="actions">
+            <a class="button primary" :href="betaStartUrl">Request Beta Access with Discord</a>
+            <a class="button ghost" :href="mcpEndpoint">MCP endpoint</a>
+          </div>
+
+          <p class="smallprint">
+            No password. No public signup. Access is not guaranteed.
+          </p>
         </div>
-        <div class="panel-body">
-          <p class="panel-label">ENDPOINT</p>
-          <div class="endpoint-value">
-            <code>{{ endpoint }}</code>
-            <button type="button" class="copy-button" @click="copy(endpoint, 'url')">
-              {{ copied === 'url' ? 'Copied' : 'Copy' }}
+
+        <aside class="panel" aria-label="Beta access status">
+          <div class="panel-top">
+            <span>Status</span>
+            <span class="dot" :class="{ active: session.authenticated }" />
+          </div>
+
+          <div class="panel-body">
+            <p class="label">Current state</p>
+            <h2>{{ session.authenticated ? 'Discord identity linked' : 'Awaiting Discord identity' }}</h2>
+            <p class="panel-copy">
+              {{ session.authenticated
+                ? `Signed in as ${session.identity?.displayName}.`
+                : 'Start the Discord OAuth flow to register your identity server-side.' }}
+            </p>
+
+            <dl v-if="session.authenticated" class="identity">
+              <div>
+                <dt>Discord user</dt>
+                <dd>{{ session.identity?.displayName }}</dd>
+              </div>
+              <div>
+                <dt>Discord id</dt>
+                <dd><code>{{ session.identity?.discordUserId }}</code></dd>
+              </div>
+            </dl>
+
+            <button
+              v-if="session.authenticated"
+              type="button"
+              class="button danger"
+              :disabled="loading"
+              @click="signOut"
+            >
+              {{ loading ? 'Signing out…' : 'Sign out' }}
             </button>
           </div>
-          <div class="mini-list">
-            <p><span>01</span> Add the server URL</p>
-            <p><span>02</span> Sign in in this browser</p>
-            <p><span>03</span> Approve the client</p>
-          </div>
-          <div class="code-box">
-            <div class="code-header">
-              <span>Config</span>
-              <button type="button" @click="copy(connectionConfig, 'config')">
-                {{ copied === 'config' ? 'Copied' : 'Copy' }}
-              </button>
-            </div>
-            <pre>{{ connectionConfig }}</pre>
-          </div>
-        </div>
-      </aside>
-    </section>
+        </aside>
+      </div>
 
-    <section id="install" class="section page-width docs-section">
-      <div class="section-intro">
-        <p class="eyebrow">INSTALL</p>
-        <h2>Client configuration.</h2>
-        <p>Add the server URL to your MCP client.</p>
-      </div>
-      <div class="docs-grid">
-        <article class="doc-card">
-          <span class="doc-step">01</span>
-          <h3>Server URL</h3>
-          <div class="endpoint-value inline">
-            <code>{{ endpoint }}</code>
-            <button type="button" class="copy-button" @click="copy(endpoint, 'url')">
-              {{ copied === 'url' ? 'Copied' : 'Copy' }}
-            </button>
-          </div>
+      <section class="facts" aria-label="Technical summary">
+        <article>
+          <h3>Protocol</h3>
+          <p>Remote HTTP MCP on <code>/mcp</code>.</p>
         </article>
-        <article class="doc-card">
-          <span class="doc-step">02</span>
-          <h3>Config</h3>
-          <div class="code-box compact">
-            <div class="code-header">
-              <span>mcpServers</span>
-              <button type="button" @click="copy(connectionConfig, 'config')">
-                {{ copied === 'config' ? 'Copied' : 'Copy' }}
-              </button>
-            </div>
-            <pre>{{ connectionConfig }}</pre>
-          </div>
+        <article>
+          <h3>Identity</h3>
+          <p>Discord OAuth is only used for human identification.</p>
         </article>
-        <article class="doc-card">
-          <span class="doc-step">03</span>
-          <h3>Compatible clients</h3>
-          <p>T3 Code, ChatGPT, or any MCP client that supports remote URLs.</p>
+        <article>
+          <h3>Access</h3>
+          <p>Manual review before any private portal or token issuance.</p>
         </article>
-      </div>
-    </section>
+      </section>
 
-    <section id="sign-in" class="section page-width auth-section">
-      <div class="section-intro">
-        <p class="eyebrow">AUTH</p>
-        <h2>{{ authenticated ? 'Authenticated.' : 'Sign in.' }}</h2>
-        <p>Browser session required for OAuth approval.</p>
-      </div>
-      <form v-if="!authenticated" class="login-form" @submit.prevent="login">
-        <label for="password">Password</label>
-        <div class="login-row">
-          <input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            required
-            placeholder="Password"
-          />
-          <button class="button primary" :disabled="busy" type="submit">
-            {{ busy ? 'Signing in…' : 'Sign in' }}
-          </button>
-        </div>
-        <p v-if="error" class="form-error" role="alert">{{ error }}</p>
-      </form>
-      <div v-else class="logged-in">
-        <span class="check">✓</span>
-        <div>
-          <strong>Session active</strong>
-          <p>Return to the client and approve the authorization request.</p>
-        </div>
-        <button type="button" class="text-button" :disabled="busy" @click="logout">Sign out</button>
-      </div>
+      <p v-if="error" class="error" role="alert">{{ error }}</p>
     </section>
-
-    <section id="use" class="section page-width">
-      <div class="section-intro centered">
-        <p class="eyebrow">USE</p>
-        <h2>How to use it.</h2>
-        <p>Keep the flow short: sign in here, then approve the client in your MCP app.</p>
-      </div>
-      <div class="docs-grid use-grid">
-        <article class="doc-card">
-          <span class="doc-step">01</span>
-          <h3>Open this page</h3>
-          <p>Use <code>https://aion-mcp.labsio.app</code> for the browser session.</p>
-        </article>
-        <article class="doc-card">
-          <span class="doc-step">02</span>
-          <h3>Sign in</h3>
-          <p>Create the OAuth session here before approving a client.</p>
-        </article>
-        <article class="doc-card">
-          <span class="doc-step">03</span>
-          <h3>Approve client</h3>
-          <p>Go back to your client and accept the authorization request.</p>
-        </article>
-      </div>
-    </section>
-
-    <footer class="footer page-width">
-      <a class="brand" href="#top">
-        <span class="brand-mark">A</span>
-        <span>AION <em>MCP</em></span>
-      </a>
-      <span>Technical docs · no sales · {{ releaseTag }}</span>
-      <a :href="`${endpoint.replace('/mcp', '')}/health`" target="_blank" rel="noreferrer">Server status</a>
-    </footer>
   </main>
 </template>
 
 <style scoped>
-.page-width {
-  width: min(1120px, calc(100% - 48px));
-  margin-inline: auto;
-}
-
 .landing {
-  color: var(--aion-text);
+  min-height: 100vh;
+  padding: 32px 0 48px;
 }
 
-.nav {
-  min-height: 84px;
+.surface {
+  width: min(1100px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px;
+  border: 1px solid rgba(81, 176, 255, 0.18);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(9, 14, 28, 0.94), rgba(6, 10, 20, 0.96)),
+    radial-gradient(circle at top, rgba(56, 166, 255, 0.14), transparent 38%);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(16px);
+}
+
+.header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .brand {
-  color: var(--aion-text);
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 0.92rem;
-  letter-spacing: 0.13em;
-  font-weight: 800;
+  gap: 12px;
 }
 
-.brand em {
-  color: var(--aion-accent-2);
-  font-style: normal;
+.brand p,
+.brand span,
+.eyebrow,
+.panel-top,
+.header-note,
+.label,
+.smallprint {
+  margin: 0;
+}
+
+.brand p {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.brand span {
+  color: var(--aion-muted);
+  font-size: 0.82rem;
 }
 
 .brand-mark {
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  border-radius: 11px;
+  color: #05101d;
   background: linear-gradient(135deg, var(--aion-accent), var(--aion-accent-2));
-  color: #070716;
-  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-  font-family: Georgia, serif;
-  font-size: 1rem;
+  font-weight: 900;
 }
 
-.nav-links {
-  display: flex;
-  gap: 26px;
-}
-
-.nav-links a,
-.nav-status {
+.header-note {
   color: var(--aion-muted);
-  text-decoration: none;
-  font-size: 0.84rem;
-}
-
-.nav-links a:hover {
-  color: var(--aion-text);
-}
-
-.nav-status {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--aion-accent);
-  box-shadow: 0 0 0 4px rgba(142, 111, 255, 0.14);
-}
-
-.status-dot.active {
-  background: #57d8ff;
-  box-shadow: 0 0 0 4px rgba(87, 216, 255, 0.14);
+  font-size: 0.82rem;
 }
 
 .hero {
   display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  gap: 72px;
-  padding: 96px 0 104px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, 0.95fr);
+  gap: 28px;
+  align-items: stretch;
 }
 
 .eyebrow {
   color: var(--aion-accent-2);
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   letter-spacing: 0.22em;
   font-weight: 800;
-  margin: 0 0 18px;
+  margin-bottom: 14px;
 }
 
 h1,
 h2,
-h3,
-p {
-  margin-top: 0;
-}
-
-h1,
-h2 {
-  color: var(--aion-text);
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-  letter-spacing: -0.045em;
+h3 {
+  margin: 0;
+  line-height: 1.05;
 }
 
 h1 {
-  max-width: 640px;
-  margin-bottom: 24px;
-  font-size: clamp(3.2rem, 6vw, 5.7rem);
-  line-height: 0.93;
+  max-width: 16ch;
+  font-size: clamp(2.8rem, 5vw, 5rem);
+  letter-spacing: -0.05em;
+}
+
+h2 {
+  font-size: clamp(1.4rem, 2vw, 2rem);
+  letter-spacing: -0.03em;
+}
+
+h3 {
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--aion-accent-2);
+}
+
+.copy {
+  padding: 12px 0;
 }
 
 .lede {
-  max-width: 620px;
+  max-width: 60ch;
+  margin: 18px 0 0;
   color: var(--aion-muted);
-  font-size: 1.08rem;
-  line-height: 1.72;
+  font-size: 1.04rem;
+  line-height: 1.7;
 }
 
-.hero-actions {
+.actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
-  margin: 34px 0 28px;
+  margin-top: 28px;
 }
 
 .button {
-  border: 1px solid transparent;
-  padding: 12px 17px;
-  min-height: 45px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  font: inherit;
-  font-weight: 700;
-  font-size: 0.83rem;
-  cursor: pointer;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1px solid transparent;
   text-decoration: none;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  font-weight: 700;
+  font-size: 0.92rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.button:hover:not(:disabled) {
-  transform: translateY(-2px);
-}
-
-.button:disabled {
-  opacity: 0.65;
-  cursor: wait;
+.button:hover {
+  transform: translateY(-1px);
 }
 
 .primary {
+  color: #06111f;
   background: linear-gradient(135deg, var(--aion-accent), var(--aion-accent-2));
-  color: #090816;
-  border-color: transparent;
 }
 
-.primary span {
-  font-size: 1.1rem;
-}
-
-.quiet {
+.ghost {
   color: var(--aion-text);
-  border-color: rgba(181, 174, 225, 0.16);
+  border-color: rgba(81, 176, 255, 0.22);
   background: rgba(255, 255, 255, 0.02);
 }
 
-.trust-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
+.danger {
+  margin-top: 20px;
+  color: #ffd7d7;
+  border-color: rgba(255, 110, 110, 0.28);
+  background: rgba(255, 110, 110, 0.08);
+}
+
+.smallprint {
+  margin-top: 16px;
   color: var(--aion-muted);
-  font-size: 0.74rem;
-}
-
-.trust-row span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.trust-row span::before {
-  content: '•';
-  color: var(--aion-accent-2);
-}
-
-.hero-panel {
-  background: rgba(12, 13, 31, 0.84);
-  border: 1px solid rgba(138, 108, 255, 0.22);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(14px);
-}
-
-.panel-top {
-  height: 47px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid rgba(138, 108, 255, 0.16);
-  padding: 0 18px;
-  color: var(--aion-muted);
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.11em;
-}
-
-.terminal-dots {
-  display: flex;
-  gap: 5px;
-}
-
-.terminal-dots i {
-  width: 6px;
-  height: 6px;
-  border-radius: 100%;
-  background: rgba(181, 174, 225, 0.32);
-}
-
-.terminal-dots i:first-child {
-  background: var(--aion-accent-2);
-}
-
-.panel-live {
-  margin-left: auto;
-  color: #79f2c1;
-  font-size: 0.58rem;
-}
-
-.panel-body {
-  padding: 28px;
-}
-
-.panel-label {
-  color: var(--aion-accent-2);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  margin-bottom: 10px;
-}
-
-.endpoint-value {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 11px;
-}
-
-.endpoint-value code {
-  color: var(--aion-text);
-  font-size: clamp(0.8rem, 2vw, 1rem);
-  overflow-wrap: anywhere;
-}
-
-.copy-button,
-.code-header button {
-  border: 1px solid rgba(181, 174, 225, 0.24);
-  color: var(--aion-text);
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-  font: inherit;
-  padding: 7px 10px;
-  font-size: 0.7rem;
-  white-space: nowrap;
-}
-
-.mini-list {
-  display: grid;
-  gap: 12px;
-  margin: 22px 0 18px;
-}
-
-.mini-list p {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  color: var(--aion-muted);
-  font-size: 0.83rem;
-}
-
-.mini-list span {
-  color: var(--aion-accent-2);
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.16em;
-}
-
-.code-box {
-  border: 1px solid rgba(138, 108, 255, 0.14);
-  background: rgba(255, 255, 255, 0.02);
-  overflow: hidden;
-}
-
-.code-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 13px 16px;
-  color: var(--aion-muted);
-  font-size: 0.7rem;
-  border-bottom: 1px solid rgba(138, 108, 255, 0.14);
-}
-
-.code-header button {
-  padding: 4px 7px;
-}
-
-.code-box pre {
-  padding: 16px;
-  margin: 0;
-  overflow-x: auto;
-  color: #d9d2ff;
-  font-size: 0.7rem;
-  line-height: 1.55;
-}
-
-.section {
-  padding: 34px 0 108px;
-}
-
-.section-intro h2 {
-  font-size: clamp(2.4rem, 4vw, 4rem);
-  line-height: 0.99;
-  margin-bottom: 18px;
-}
-
-.section-intro > p:not(.eyebrow) {
-  color: var(--aion-muted);
-  line-height: 1.65;
-  max-width: 520px;
-}
-
-.centered {
-  text-align: center;
-}
-
-.centered > p:not(.eyebrow) {
-  margin-inline: auto;
-}
-
-.docs-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 44px;
-}
-
-.doc-card,
-.login-form,
-.logged-in {
-  border: 1px solid rgba(181, 174, 225, 0.14);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.doc-card {
-  padding: 24px;
-  min-height: 184px;
-}
-
-.doc-step {
-  color: var(--aion-accent-2);
-  font-size: 0.66rem;
-  letter-spacing: 0.16em;
-  font-weight: 800;
-}
-
-.doc-card h3 {
-  margin: 13px 0 8px;
-  font-size: 1rem;
-  color: var(--aion-text);
-}
-
-.doc-card p {
-  color: var(--aion-muted);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  margin-bottom: 0;
-}
-
-.doc-card code {
-  color: #99d6ff;
-}
-
-.endpoint-value.inline {
-  margin-top: 12px;
-}
-
-.compact {
-  margin-top: 12px;
-}
-
-.auth-section {
-  display: grid;
-  grid-template-columns: 0.88fr 1.12fr;
-  gap: 72px;
-  align-items: center;
-}
-
-.login-form {
-  padding: 28px;
-}
-
-.login-form label {
-  display: block;
-  color: var(--aion-text);
-  font-size: 0.75rem;
-  margin-bottom: 9px;
-}
-
-.login-row {
-  display: flex;
-  gap: 10px;
-}
-
-.login-row input {
-  min-width: 0;
-  flex: 1;
-  border: 1px solid rgba(181, 174, 225, 0.18);
-  background: rgba(7, 8, 22, 0.72);
-  color: var(--aion-text);
-  padding: 12px;
-  font: inherit;
-  outline: none;
-}
-
-.login-row input:focus {
-  border-color: var(--aion-accent-2);
-}
-
-.form-error {
-  color: #ffb7b7;
-  font-size: 0.78rem;
-  margin: 12px 0 0;
-}
-
-.logged-in {
-  display: flex;
-  gap: 15px;
-  align-items: flex-start;
-  padding: 26px;
-}
-
-.check {
-  display: grid;
-  place-items: center;
-  width: 27px;
-  height: 27px;
-  flex: 0 0 auto;
-  border-radius: 50%;
-  background: var(--aion-accent-2);
-  color: #08131b;
-  font-weight: 800;
-}
-
-.logged-in strong {
-  color: var(--aion-text);
-}
-
-.logged-in p {
-  color: var(--aion-muted);
-  font-size: 0.8rem;
-  margin: 5px 0 0;
+  font-size: 0.86rem;
   line-height: 1.5;
 }
 
-.text-button {
-  margin-left: auto;
-  border: 0;
-  color: var(--aion-accent-2);
-  background: none;
-  font: inherit;
-  font-size: 0.75rem;
-  cursor: pointer;
-  white-space: nowrap;
+.panel {
+  border-radius: 22px;
+  border: 1px solid rgba(81, 176, 255, 0.14);
+  background: rgba(6, 10, 20, 0.72);
+  overflow: hidden;
 }
 
-.footer {
-  min-height: 108px;
+.panel-top {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(81, 176, 255, 0.12);
   color: var(--aion-muted);
   font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
-.footer > a:last-child {
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(122, 140, 168, 0.8);
+  box-shadow: 0 0 0 4px rgba(122, 140, 168, 0.12);
+}
+
+.dot.active {
+  background: var(--aion-accent-2);
+  box-shadow: 0 0 0 4px rgba(87, 216, 255, 0.14);
+}
+
+.panel-body {
+  padding: 24px 18px 18px;
+}
+
+.label {
   color: var(--aion-accent-2);
-  text-decoration: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 800;
 }
 
-@media (max-width: 820px) {
-  .page-width {
-    width: min(100% - 32px, 620px);
-  }
+.panel-copy {
+  margin: 12px 0 0;
+  color: var(--aion-muted);
+  line-height: 1.6;
+}
 
-  .nav {
-    min-height: 70px;
-  }
+.identity {
+  display: grid;
+  gap: 14px;
+  margin: 22px 0 0;
+}
 
-  .nav-links {
-    display: none;
+.identity dt {
+  color: var(--aion-muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.identity dd {
+  margin: 0;
+  color: var(--aion-text);
+  word-break: break-word;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.facts article {
+  min-height: 118px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(81, 176, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.facts p {
+  margin: 12px 0 0;
+  color: var(--aion-muted);
+  line-height: 1.55;
+}
+
+.error {
+  margin: 18px 0 0;
+  color: #ffbbbb;
+}
+
+code {
+  color: #d7f7ff;
+}
+
+@media (max-width: 900px) {
+  .surface {
+    width: min(100% - 20px, 1100px);
+    padding: 20px;
+    border-radius: 22px;
   }
 
   .hero,
-  .auth-section {
-    grid-template-columns: 1fr;
-    gap: 42px;
-  }
-
-  .hero {
-    padding: 68px 0 80px;
-  }
-
-  .hero-panel {
-    max-width: 520px;
-    width: calc(100% - 12px);
-  }
-
-  .docs-grid {
+  .facts {
     grid-template-columns: 1fr;
   }
 
-  .section {
-    padding-bottom: 82px;
-  }
-
-  .footer {
-    padding: 30px 0;
-    min-height: 0;
-    flex-wrap: wrap;
-  }
-
-  .endpoint-value {
+  .header {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .login-row {
-    flex-direction: column;
-  }
-
-  .login-row .button {
-    width: 100%;
-  }
-
-  .text-button {
-    margin-left: 0;
+  h1 {
+    max-width: none;
   }
 }
 </style>
