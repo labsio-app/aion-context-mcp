@@ -322,3 +322,14 @@ export function createDiscordBetaController(deps: DiscordBetaControllerDeps) {
     sessionDelete
   }
 }
+
+export async function resolveAuthenticatedDiscordIdentity(
+  event: H3Event,
+  store: DiscordBetaStore
+): Promise<DiscordIdentityRecord | null> {
+  const token = getCookie(event, sessionCookieName)
+  if (!token) return null
+
+  const session = await store.getSession(sha256Hex(token))
+  return session?.identity ?? null
+}

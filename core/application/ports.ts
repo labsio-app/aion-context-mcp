@@ -92,3 +92,24 @@ export interface DiscordBetaStore {
 
   deleteSession(tokenHash: string): Promise<void>
 }
+
+export type BetaAccessRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED'
+
+export interface BetaAccessRequestRecord {
+  id: string
+  discordIdentityId: string
+  displayName: string
+  motivation: string
+  intendedUsage: string
+  aionProfile: string | null
+  expectedClients: string[]
+  status: BetaAccessRequestStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BetaAccessStore {
+  getLatestRequestByDiscordIdentityId(discordIdentityId: string): Promise<BetaAccessRequestRecord | null>
+  getActiveRequestByDiscordIdentityId(discordIdentityId: string): Promise<BetaAccessRequestRecord | null>
+  saveBetaAccessRequest(request: BetaAccessRequestRecord): Promise<BetaAccessRequestRecord>
+}

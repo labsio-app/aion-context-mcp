@@ -8,19 +8,107 @@ interface BetaSession {
   }
 }
 
-const requestUrl = useRequestURL()
-const session = ref<BetaSession>({ authenticated: false })
-const loading = ref(false)
-const error = ref('')
+interface BetaAccessRequest {
+  id: string
+  discordIdentityId: string
+  displayName: string
+  motivation: string
+  intendedUsage: string
+  aionProfile: string | null
+  expectedClients: string[]
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'REVOKED'
+  createdAt: string
+  updatedAt: string
+}
 
-const mcpEndpoint = computed(() => `${requestUrl.origin}/mcp`)
+interface BetaAccessState {
+  authenticated: true
+  identity: {
+    id: string
+    discordUserId: string
+    displayName: string
+  }
+  canSubmit: boolean
+  request: BetaAccessRequest | null
+}
+
+const session = ref<BetaSession>({ authenticated: false })
+const accessState = ref<BetaAccessState | null>(null)
+const loading = ref(false)
+const accessLoading = ref(false)
+const requestBusy = ref(false)
+const error = ref('')
+const requestError = ref('')
+const accessError = ref('')
+
 const betaStartUrl = '/api/beta/discord/start'
+const expectedClientOptions = [
+  'T3 Code',
+  'Codex',
+  'Claude',
+  'ChatGPT',
+  'Custom MCP client',
+  'Other'
+] as const
+
+const requestForm = reactive({
+  displayName: '',
+  motivation: '',
+  intendedUsage: '',
+  aionProfile: '',
+  expectedClients: [] as string[]
+})
+
+const requestStatus = computed(() => accessState.value?.request?.status ?? null)
+
+function resetRequestForm(displayName = '') {
+  requestForm.displayName = displayName
+  requestForm.motivation = ''
+  requestForm.intendedUsage = ''
+  requestForm.aionProfile = ''
+  requestForm.expectedClients = []
+}
+
+async function refreshAccess() {
+  if (!session.value.authenticated) {
+    accessState.value = null
+    accessLoading.value = false
+    accessError.value = ''
+    return
+  }
+
+  accessLoading.value = true
+  accessError.value = ''
+  requestError.value = ''
+  try {
+    accessState.value = await $fetch<BetaAccessState>('/api/beta/access')
+    if (!requestForm.displayName) {
+      requestForm.displayName = session.value.identity?.displayName ?? ''
+    }
+  } catch {
+    accessState.value = null
+    accessError.value = 'Could not load your private beta status.'
+  } finally {
+    accessLoading.value = false
+  }
+}
 
 async function refreshSession() {
   try {
     session.value = await $fetch<BetaSession>('/api/beta/session')
+    if (session.value.authenticated) {
+      if (!requestForm.displayName) {
+        requestForm.displayName = session.value.identity?.displayName ?? ''
+      }
+      await refreshAccess()
+    } else {
+      accessState.value = null
+      resetRequestForm()
+    }
   } catch {
     session.value = { authenticated: false }
+    accessState.value = null
+    resetRequestForm()
   }
 }
 
@@ -32,10 +120,42 @@ async function signOut() {
     session.value = await $fetch<BetaSession>('/api/beta/session', {
       method: 'DELETE'
     })
+    accessState.value = null
+    accessError.value = ''
+    resetRequestForm()
   } catch {
     error.value = 'Sign-out failed.'
   } finally {
     loading.value = false
+  }
+}
+
+async function submitRequest() {
+  if (!session.value.authenticated || requestBusy.value || accessLoading.value) return
+  requestBusy.value = true
+  requestError.value = ''
+  try {
+    accessState.value = await $fetch<BetaAccessState>('/api/beta/access', {
+      method: 'POST',
+      body: {
+        displayName: requestForm.displayName,
+        motivation: requestForm.motivation,
+        intendedUsage: requestForm.intendedUsage,
+        aionProfile: requestForm.aionProfile || null,
+        expectedClients: requestForm.expectedClients
+      }
+    })
+  } catch (cause: any) {
+    const statusMessage = String(cause?.data?.statusMessage ?? '')
+    if (statusMessage === 'active_request_exists') {
+      requestError.value = 'A private beta request is already active for this account.'
+    } else if (statusMessage) {
+      requestError.value = statusMessage
+    } else {
+      requestError.value = 'Could not submit the request.'
+    }
+  } finally {
+    requestBusy.value = false
   }
 }
 
@@ -61,50 +181,179 @@ onMounted(refreshSession)
           <p class="eyebrow">PUBLIC</p>
           <h1>Connect an AI client to persistent AION context.</h1>
           <p class="lede">
-            Access is manual and limited. Discord is used to identify beta applicants, not to
-            authenticate the MCP protocol.
+            Access is manual and limited. Discord is used to identify beta applicants.
           </p>
 
           <div class="actions">
-            <a class="button primary" :href="betaStartUrl">Request Beta Access with Discord</a>
-            <a class="button ghost" :href="mcpEndpoint">MCP endpoint</a>
+            <a class="button primary" :href="betaStartUrl">Request access with Discord</a>
           </div>
 
           <p class="smallprint">
-            No password. No public signup. Access is not guaranteed.
+            No public signup. Access is not guaranteed.
           </p>
         </div>
 
         <aside class="panel" aria-label="Beta access status">
           <div class="panel-top">
             <span>Status</span>
-            <span class="dot" :class="{ active: session.authenticated }" />
+            <span class="dot" :class="{ active: session.authenticated && !accessLoading }" />
           </div>
 
           <div class="panel-body">
-            <p class="label">Current state</p>
-            <h2>{{ session.authenticated ? 'Discord identity linked' : 'Awaiting Discord identity' }}</h2>
-            <p class="panel-copy">
-              {{ session.authenticated
-                ? `Signed in as ${session.identity?.displayName}.`
-                : 'Start the Discord OAuth flow to register your identity server-side.' }}
-            </p>
+            <template v-if="!session.authenticated">
+              <p class="label">Current state</p>
+              <h2>Awaiting Discord identity</h2>
+              <p class="panel-copy">
+                Start the Discord OAuth flow to register your identity server-side.
+              </p>
+            </template>
 
-            <dl v-if="session.authenticated" class="identity">
-              <div>
-                <dt>Discord user</dt>
-                <dd>{{ session.identity?.displayName }}</dd>
+            <template v-else>
+              <p class="label">Private beta access</p>
+              <h2 v-if="accessLoading">Loading access state…</h2>
+              <h2 v-else-if="requestStatus === 'PENDING'">Request pending</h2>
+              <h2 v-else-if="requestStatus === 'APPROVED'">Access approved</h2>
+              <h2 v-else-if="requestStatus === 'REJECTED'">Access request not approved</h2>
+              <h2 v-else-if="requestStatus === 'REVOKED'">Access revoked</h2>
+              <h2 v-else>Request private beta access</h2>
+
+              <p class="panel-copy">
+                <span v-if="accessLoading">Checking your private beta access state.</span>
+                <span v-else-if="requestStatus === 'PENDING'">
+                  Request received. Your private beta request is pending review.
+                </span>
+                <span v-else-if="requestStatus === 'APPROVED'">
+                  Your account has been approved for the private beta. The private workspace will
+                  be available here.
+                </span>
+                <span v-else-if="requestStatus === 'REJECTED'">
+                  Your current request was not approved.
+                </span>
+                <span v-else-if="requestStatus === 'REVOKED'">
+                  Your access to the private beta is no longer active.
+                </span>
+                <span v-else>
+                  Tell us briefly how you plan to use AION MCP. Access is reviewed manually.
+                  Submitting a request does not guarantee access, and no review delay is
+                  promised.
+                </span>
+              </p>
+
+              <dl class="identity">
+                <div>
+                  <dt>Discord user</dt>
+                  <dd>{{ session.identity?.displayName }}</dd>
+                </div>
+                <div>
+                  <dt>Discord id</dt>
+                  <dd><code>{{ session.identity?.discordUserId }}</code></dd>
+                </div>
+              </dl>
+
+              <div v-if="accessLoading" class="loading-state" aria-live="polite">
+                Loading private beta status…
               </div>
-              <div>
-                <dt>Discord id</dt>
-                <dd><code>{{ session.identity?.discordUserId }}</code></dd>
+
+              <div v-else-if="requestStatus === 'PENDING'" class="status-card">
+                <strong>Request pending</strong>
+                <p>Your access request is currently under review.</p>
+                <p>Access is manually reviewed. No response time is guaranteed.</p>
               </div>
-            </dl>
+
+              <div v-else-if="requestStatus === 'APPROVED'" class="status-card">
+                <strong>Access approved</strong>
+                <p>Your account has been approved for the private beta.</p>
+                <p>The private workspace will be available here.</p>
+              </div>
+
+              <div v-else-if="requestStatus === 'REJECTED'" class="status-card">
+                <strong>Access request not approved</strong>
+                <p>Your current request was not approved.</p>
+              </div>
+
+              <div v-else-if="requestStatus === 'REVOKED'" class="status-card">
+                <strong>Access revoked</strong>
+                <p>Your access to the private beta is no longer active.</p>
+              </div>
+
+              <div v-else-if="accessError" class="loading-state" role="alert">
+                {{ accessError }}
+              </div>
+
+              <form v-else class="beta-form" @submit.prevent="submitRequest">
+                <label class="field">
+                  <span>Display name</span>
+                  <input
+                    v-model="requestForm.displayName"
+                    type="text"
+                    required
+                    maxlength="120"
+                    autocomplete="nickname"
+                  />
+                </label>
+
+                <label class="field">
+                  <span>Why do you want to join?</span>
+                  <textarea
+                    v-model="requestForm.motivation"
+                    required
+                    rows="4"
+                    maxlength="2000"
+                    placeholder="Tell us briefly why you want access."
+                  />
+                </label>
+
+                <label class="field">
+                  <span>How do you plan to use AION MCP?</span>
+                  <textarea
+                    v-model="requestForm.intendedUsage"
+                    required
+                    rows="4"
+                    maxlength="2000"
+                    placeholder="Describe your intended usage."
+                  />
+                </label>
+
+                <label class="field">
+                  <span>AION profile / experience</span>
+                  <textarea
+                    v-model="requestForm.aionProfile"
+                    rows="3"
+                    maxlength="2000"
+                    placeholder="Optional"
+                  />
+                </label>
+
+                <fieldset class="field">
+                  <legend>Expected MCP clients</legend>
+                  <div class="checkbox-grid">
+                    <label v-for="option in expectedClientOptions" :key="option" class="check-option">
+                      <input
+                        v-model="requestForm.expectedClients"
+                        type="checkbox"
+                        :value="option"
+                      />
+                      <span>{{ option }}</span>
+                    </label>
+                  </div>
+                </fieldset>
+
+                <p v-if="requestError" class="form-error" role="alert">{{ requestError }}</p>
+
+                <button
+                  type="submit"
+                  class="button primary"
+                  :disabled="requestBusy || accessLoading"
+                >
+                  {{ requestBusy ? 'Submitting…' : 'Submit request' }}
+                </button>
+              </form>
+            </template>
 
             <button
               v-if="session.authenticated"
               type="button"
-              class="button danger"
+              class="button danger sign-out"
               :disabled="loading"
               @click="signOut"
             >
@@ -116,16 +365,16 @@ onMounted(refreshSession)
 
       <section class="facts" aria-label="Technical summary">
         <article>
-          <h3>Protocol</h3>
-          <p>Remote HTTP MCP on <code>/mcp</code>.</p>
+          <h3>Persistent context</h3>
+          <p>Research survives individual AI sessions.</p>
         </article>
         <article>
-          <h3>Identity</h3>
-          <p>Discord OAuth is only used for human identification.</p>
+          <h3>Source aware</h3>
+          <p>Stored knowledge keeps provenance and applicability.</p>
         </article>
         <article>
-          <h3>Access</h3>
-          <p>Manual review before any private portal or token issuance.</p>
+          <h3>AI client agnostic</h3>
+          <p>Designed for approved AI clients.</p>
         </article>
       </section>
 
@@ -344,6 +593,98 @@ h3 {
   padding: 24px 18px 18px;
 }
 
+.loading-state,
+.pending-card,
+.status-card {
+  margin: 16px 0 18px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(81, 176, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--aion-muted);
+  line-height: 1.6;
+}
+
+.pending-card strong,
+.status-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--aion-text);
+}
+
+.beta-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.field > span,
+.field legend {
+  color: var(--aion-text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border: 1px solid rgba(81, 176, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(4, 7, 16, 0.96);
+  color: var(--aion-text);
+  padding: 12px 14px;
+  outline: none;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: rgba(82, 239, 217, 0.8);
+  box-shadow: 0 0 0 3px rgba(82, 239, 217, 0.12);
+}
+
+.checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.check-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--aion-muted);
+  font-size: 0.88rem;
+}
+
+.check-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--aion-accent-2);
+}
+
+.form-error {
+  margin: 0;
+  color: #ffb6b6;
+  line-height: 1.5;
+}
+
+.sign-out {
+  width: 100%;
+  margin-top: 10px;
+}
+
 .label {
   color: var(--aion-accent-2);
   font-size: 0.72rem;
@@ -361,7 +702,7 @@ h3 {
 .identity {
   display: grid;
   gap: 14px;
-  margin: 22px 0 0;
+  margin: 18px 0 0;
 }
 
 .identity dt {
@@ -427,6 +768,10 @@ code {
 
   h1 {
     max-width: none;
+  }
+
+  .checkbox-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>
