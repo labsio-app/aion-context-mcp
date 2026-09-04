@@ -82,9 +82,9 @@ onMounted(async () => {
         <span>AION <em>MCP</em></span>
       </a>
       <div class="nav-links">
-        <a href="#connect">Connect</a>
+        <a href="#install">Install</a>
         <a href="#sign-in">Sign in</a>
-        <a href="#capabilities">Capabilities</a>
+        <a href="#use">Use</a>
       </div>
       <a class="nav-status" href="#sign-in">
         <span class="status-dot" :class="{ active: authenticated }" />
@@ -97,10 +97,10 @@ onMounted(async () => {
         <p class="eyebrow">REMOTE MCP</p>
         <h1>AION MCP</h1>
         <p class="lede">
-          Public MCP endpoint for AION context and OAuth access.
+          Technical endpoint for MCP clients and browser-based OAuth access.
         </p>
         <div class="hero-actions">
-          <a class="button primary" href="#connect">Copy endpoint <span>→</span></a>
+          <a class="button primary" href="#install">Install notes <span>→</span></a>
           <a class="button quiet" href="#sign-in">Sign in</a>
         </div>
         <div class="trust-row">
@@ -142,26 +142,40 @@ onMounted(async () => {
       </aside>
     </section>
 
-    <section id="connect" class="section page-width">
+    <section id="install" class="section page-width docs-section">
       <div class="section-intro">
-        <p class="eyebrow">SETUP</p>
-        <h2>Three steps.</h2>
+        <p class="eyebrow">INSTALL</p>
+        <h2>Client configuration.</h2>
+        <p>Add the server URL to your MCP client.</p>
       </div>
-      <div class="steps-grid">
-        <article class="step-card">
-          <span class="step-number">01</span>
-          <h3>Add the server</h3>
-          <p>Use the remote MCP URL in a compatible client.</p>
+      <div class="docs-grid">
+        <article class="doc-card">
+          <span class="doc-step">01</span>
+          <h3>Server URL</h3>
+          <div class="endpoint-value inline">
+            <code>{{ endpoint }}</code>
+            <button type="button" class="copy-button" @click="copy(endpoint, 'url')">
+              {{ copied === 'url' ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
         </article>
-        <article class="step-card">
-          <span class="step-number">02</span>
-          <h3>Approve access</h3>
-          <p>Sign in here to create a browser session for OAuth approval.</p>
+        <article class="doc-card">
+          <span class="doc-step">02</span>
+          <h3>Config</h3>
+          <div class="code-box compact">
+            <div class="code-header">
+              <span>mcpServers</span>
+              <button type="button" @click="copy(connectionConfig, 'config')">
+                {{ copied === 'config' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+            <pre>{{ connectionConfig }}</pre>
+          </div>
         </article>
-        <article class="step-card">
-          <span class="step-number">03</span>
-          <h3>Search first</h3>
-          <p>Use the MCP tools exposed by the server.</p>
+        <article class="doc-card">
+          <span class="doc-step">03</span>
+          <h3>Compatible clients</h3>
+          <p>T3 Code, ChatGPT, or any MCP client that supports remote URLs.</p>
         </article>
       </div>
     </section>
@@ -169,8 +183,8 @@ onMounted(async () => {
     <section id="sign-in" class="section page-width auth-section">
       <div class="section-intro">
         <p class="eyebrow">AUTH</p>
-        <h2>{{ authenticated ? 'Authenticated.' : 'Sign in to approve clients.' }}</h2>
-        <p>Browser session only. Required for OAuth redirects.</p>
+        <h2>{{ authenticated ? 'Authenticated.' : 'Sign in.' }}</h2>
+        <p>Browser session required for OAuth approval.</p>
       </div>
       <form v-if="!authenticated" class="login-form" @submit.prevent="login">
         <label for="password">Password</label>
@@ -193,58 +207,33 @@ onMounted(async () => {
         <span class="check">✓</span>
         <div>
           <strong>Session active</strong>
-          <p>Return to the client and approve the request.</p>
+          <p>Return to the client and approve the authorization request.</p>
         </div>
         <button type="button" class="text-button" :disabled="busy" @click="logout">Sign out</button>
       </div>
     </section>
 
-    <section id="capabilities" class="section page-width">
+    <section id="use" class="section page-width">
       <div class="section-intro centered">
-        <p class="eyebrow">TOOLS</p>
-        <h2>Exposed MCP tools.</h2>
-        <p>Use the server tools from a compatible client.</p>
+        <p class="eyebrow">USE</p>
+        <h2>How to use it.</h2>
+        <p>Keep the flow short: sign in here, then approve the client in your MCP app.</p>
       </div>
-      <div class="features-grid">
-        <article class="feature-card featured">
-          <span class="feature-icon">⌕</span>
-          <h3>Search context</h3>
-          <code>aion_search_context</code>
-          <p>Searches stored context before an answer.</p>
+      <div class="docs-grid use-grid">
+        <article class="doc-card">
+          <span class="doc-step">01</span>
+          <h3>Open this page</h3>
+          <p>Use <code>https://aion-mcp.labsio.app</code> for the browser session.</p>
         </article>
-        <article class="feature-card">
-          <span class="feature-icon">⌁</span>
-          <h3>Preserve evidence</h3>
-          <code>aion_record_source</code>
-          <p>Records links, transcripts, and notes.</p>
+        <article class="doc-card">
+          <span class="doc-step">02</span>
+          <h3>Sign in</h3>
+          <p>Create the OAuth session here before approving a client.</p>
         </article>
-        <article class="feature-card">
-          <span class="feature-icon">↯</span>
-          <h3>Make doubt visible</h3>
-          <code>aion_record_challenge</code>
-          <p>Stores contradictions and counter-evidence.</p>
-        </article>
-      </div>
-    </section>
-
-    <section id="legal" class="section page-width">
-      <div class="section-intro centered">
-        <p class="eyebrow">LEGAL</p>
-        <h2>Independent project.</h2>
-        <p>Short notice for access and distribution.</p>
-      </div>
-      <div class="legal-grid">
-        <article class="legal-card">
-          <h3>Not affiliated</h3>
-          <p>This site is independent and not affiliated with any client vendor.</p>
-        </article>
-        <article class="legal-card">
-          <h3>No sales</h3>
-          <p>No products, subscriptions, or affiliate links are offered here.</p>
-        </article>
-        <article class="legal-card">
-          <h3>Access only</h3>
-          <p>The site exposes the MCP endpoint and browser OAuth session only.</p>
+        <article class="doc-card">
+          <span class="doc-step">03</span>
+          <h3>Approve client</h3>
+          <p>Go back to your client and accept the authorization request.</p>
         </article>
       </div>
     </section>
@@ -254,7 +243,7 @@ onMounted(async () => {
         <span class="brand-mark">A</span>
         <span>AION <em>MCP</em></span>
       </a>
-      <span>Independent MCP endpoint · no sales · {{ releaseTag }}</span>
+      <span>Technical docs · no sales · {{ releaseTag }}</span>
       <a :href="`${endpoint.replace('/mcp', '')}/health`" target="_blank" rel="noreferrer">Server status</a>
     </footer>
   </main>
@@ -607,53 +596,55 @@ h1 {
   margin-inline: auto;
 }
 
-.steps-grid,
-.features-grid,
-.legal-grid {
+.docs-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-top: 44px;
 }
 
-.step-card,
-.feature-card,
-.legal-card,
+.doc-card,
 .login-form,
 .logged-in {
   border: 1px solid rgba(181, 174, 225, 0.14);
   background: rgba(255, 255, 255, 0.02);
 }
 
-.step-card {
+.doc-card {
   padding: 24px;
   min-height: 184px;
 }
 
-.step-number {
+.doc-step {
   color: var(--aion-accent-2);
   font-size: 0.66rem;
   letter-spacing: 0.16em;
   font-weight: 800;
 }
 
-.step-card h3,
-.feature-card h3 {
+.doc-card h3 {
   margin: 13px 0 8px;
   font-size: 1rem;
   color: var(--aion-text);
 }
 
-.step-card p,
-.feature-card p {
+.doc-card p {
   color: var(--aion-muted);
   font-size: 0.85rem;
   line-height: 1.6;
   margin-bottom: 0;
 }
 
-.step-card code {
+.doc-card code {
   color: #99d6ff;
+}
+
+.endpoint-value.inline {
+  margin-top: 12px;
+}
+
+.compact {
+  margin-top: 12px;
 }
 
 .auth-section {
@@ -741,54 +732,6 @@ h1 {
   white-space: nowrap;
 }
 
-.features-grid {
-  margin-top: 52px;
-}
-
-.feature-card {
-  min-height: 226px;
-  padding: 28px;
-}
-
-.feature-card.featured {
-  background:
-    radial-gradient(circle at 0 0, rgba(87, 216, 255, 0.11), transparent 16rem),
-    rgba(255, 255, 255, 0.03);
-}
-
-.feature-icon {
-  display: block;
-  color: var(--aion-accent-2);
-  font-size: 1.45rem;
-  min-height: 37px;
-}
-
-.feature-card code {
-  color: #99d6ff;
-  font-size: 0.7rem;
-}
-
-.feature-card p {
-  margin-top: 17px;
-}
-
-.legal-card {
-  padding: 24px;
-}
-
-.legal-card h3 {
-  margin: 0 0 8px;
-  font-size: 0.98rem;
-  color: var(--aion-text);
-}
-
-.legal-card p {
-  color: var(--aion-muted);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  margin: 0;
-}
-
 .footer {
   min-height: 108px;
   display: flex;
@@ -832,9 +775,7 @@ h1 {
     width: calc(100% - 12px);
   }
 
-  .steps-grid,
-  .features-grid,
-  .legal-grid {
+  .docs-grid {
     grid-template-columns: 1fr;
   }
 
