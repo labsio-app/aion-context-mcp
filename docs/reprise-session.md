@@ -1,61 +1,61 @@
-# Reprise de session
+# Session handover
 
 Date: 2026-09-04
 
-## Contexte
+## Context
 
-Le projet AION Context MCP est déjà déployé sur le VPS, avec:
+The AION Context MCP project is deployed to the VPS with:
 
-- `aion-mcp.labsio.app` branché sur le MCP public
-- auth OAuth réelle pour MCP clients externes
-- dépôt GitHub public créé
-- corpus métier ajouté dans `references/`
-- synthèse métier dans `docs/metier.md`
-- spec RAG créée dans `aidd_docs/tasks/2026_09/2026_09_03_rag/spec.md`
+- `aion-mcp.labsio.app` connected to the public MCP;
+- real OAuth authentication for external MCP clients;
+- a public GitHub repository;
+- the product corpus under `references/`;
+- product documentation in `docs/metier.md`; and
+- a RAG specification at `aidd_docs/tasks/2026_09/2026_09_03_rag/spec.md`.
 
-## Ce qui est en place
+## What is in place
 
-- Le corpus métier source est considéré canon.
-- La doc métier décrit le produit et ses règles.
-- La spec RAG fixe le contrat attendu:
-  - provenance traçable
-  - scope explicite
-  - conflits visibles
-  - pas d’invention silencieuse
+- The source product corpus is canonical.
+- The product documentation describes the product and its rules.
+- The RAG specification establishes the expected contract:
+  - traceable provenance;
+  - explicit scope;
+  - visible conflicts; and
+  - no silent invention.
 
-## À reprendre en priorité
+## Next priorities
 
-1. Définir le schéma de données RAG à partir de la spec.
-2. Décider comment représenter:
-   - les chunks de corpus
-   - les métadonnées de scope
-   - les liens source -> extrait -> claim
-   - les conflits / challenges
-3. Formaliser les points d’entrée MCP pour:
-   - rechercher le corpus
-   - ingérer un document
-   - retracer la provenance d’une réponse
-4. Vérifier si le corpus `references/*.docx` doit rester brut ou être converti en markdown versionné.
+1. Define the RAG data model from the specification.
+2. Decide how to represent:
+   - corpus chunks;
+   - scope metadata;
+   - source → excerpt → claim links; and
+   - conflicts / challenges.
+3. Formalize MCP entry points to:
+   - search the corpus;
+   - ingest a document; and
+   - trace the provenance of an answer.
+4. Decide whether `references/*.docx` should stay raw or be converted into versioned Markdown.
 
-## Règles à respecter
+## Rules to retain
 
-- Le corpus reste la source canon.
-- `docs/metier.md` reste une synthèse stable.
-- Le RAG ne doit pas écraser la provenance.
-- Toute réponse doit conserver le scope (`GLOBAL`, `TW`, `KR`, `UNKNOWN`).
-- Les contradictions doivent être conservées, pas écrasées.
+- The corpus remains canonical.
+- `docs/metier.md` remains a stable summary.
+- RAG must not overwrite provenance.
+- Every answer must retain its scope (`GLOBAL`, `TW`, `KR`, `UNKNOWN`).
+- Contradictions must be retained, not overwritten.
 
-## Liens utiles
+## Useful links
 
 - [`README.md`](../README.md)
 - [`docs/metier.md`](metier.md)
 - [`references/README.md`](../references/README.md)
 - [`aidd_docs/tasks/2026_09/2026_09_03_rag/spec.md`](../aidd_docs/tasks/2026_09/2026_09_03_rag/spec.md)
 
-## Note de reprise
+## Handover note
 
-Quand tu reprends:
+When resuming work:
 
-- commence par relire la spec RAG
-- puis décide du contrat de données avant l’implémentation
-- évite de choisir trop tôt une techno d’indexation
+- start by rereading the RAG specification;
+- decide on the data contract before implementation; and
+- avoid choosing an indexing technology too early.

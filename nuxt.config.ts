@@ -3,7 +3,11 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   css: ['~/assets/main.css'],
   runtimeConfig: {
-    adminToken: process.env.NUXT_ADMIN_TOKEN ?? ''
+    adminToken: process.env.NUXT_ADMIN_TOKEN ?? '',
+    public: {
+      releaseTag: process.env.NUXT_PUBLIC_RELEASE_TAG ?? 'v0.1.0',
+      commitSha: process.env.NUXT_PUBLIC_COMMIT_SHA ?? ''
+    }
   },
   app: {
     head: {
@@ -11,7 +15,7 @@ export default defineNuxtConfig({
       meta: [
         {
           name: 'description',
-          content: 'Small MCP-backed knowledge cockpit for AION 2 research.'
+          content: 'Reliable, source-aware AION 2 context for MCP clients.'
         }
       ]
     }

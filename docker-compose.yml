@@ -45,6 +45,8 @@ services:
       PGPASSWORD_FILE: /run/secrets/postgres_password
       PGSCHEMA: ${PGSCHEMA:-aion_context_mcp}
       NUXT_ADMIN_TOKEN: ${NUXT_ADMIN_TOKEN:-}
+      NUXT_PUBLIC_RELEASE_TAG: ${APP_RELEASE_TAG:-v0.1.0}
+      NUXT_PUBLIC_COMMIT_SHA: ${APP_COMMIT_SHA:-}
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
     ports:

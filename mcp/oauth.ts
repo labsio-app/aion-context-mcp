@@ -3,6 +3,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { getPool } from '../infrastructure/postgres/pool.js'
 
 const scopeName = 'mcp:access'
+const browserSessionCookieName = 'aion_mcp_session'
+const browserSessionLifetimeSeconds = 60 * 60 * 12
 
 function production(): boolean {
   return process.env.NODE_ENV === 'production'
@@ -42,6 +44,34 @@ function timingSafeEqualText(a: string, b: string): boolean {
   const left = Buffer.from(a)
   const right = Buffer.from(b)
   return left.length === right.length && timingSafeEqual(left, right)
+}
+
+function getCookie(request: FastifyRequest, name: string): string | null {
+  const cookieHeader = request.headers.cookie ?? ''
+  for (const item of cookieHeader.split(';')) {
+    const [rawName, ...rawValue] = item.trim().split('=')
+    if (rawName !== name) continue
+    const value = rawValue.join('=')
+    if (!value) return null
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function sessionCookie(value: string, maxAge: number): string {
+  const attributes = [
+    `${browserSessionCookieName}=${encodeURIComponent(value)}`,
+    'Path=/oauth',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${maxAge}`
+  ]
+  if (production()) attributes.push('Secure')
+  return attributes.join('; ')
 }
 
 function nowIso(): string {
@@ -321,6 +351,30 @@ function signJwt(payload: Record<string, unknown>): string {
   return `${signingInput}.${base64UrlEncode(signature)}`
 }
 
+function getBrowserSession(request: FastifyRequest): Record<string, unknown> | null {
+  const token = getCookie(request, browserSessionCookieName)
+  if (!token) return null
+
+  const payload = verifyJwt(token)
+  if (payload?.sub !== 'aion-owner' || payload.type !== 'browser_session') return null
+  return payload
+}
+
+function setBrowserSession(reply: FastifyReply) {
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const token = signJwt({
+    sub: 'aion-owner',
+    type: 'browser_session',
+    iat: issuedAt,
+    exp: issuedAt + browserSessionLifetimeSeconds
+  })
+  reply.header('Set-Cookie', sessionCookie(token, browserSessionLifetimeSeconds))
+}
+
+function loginPasswordMatches(candidate: unknown): boolean {
+  return typeof candidate === 'string' && timingSafeEqualText(candidate, loginPassword())
+}
+
 function verifyJwt(token: string): Record<string, unknown> | null {
   const parts = token.split('.')
   if (parts.length !== 3) return null
@@ -439,7 +493,7 @@ function audienceMatches(value: unknown, expected: string): boolean {
   return false
 }
 
-function renderAuthorizeForm(params: URLSearchParams, error?: string) {
+function renderAuthorizeForm(params: URLSearchParams, error?: string, signedIn = false) {
   const esc = (value: string) =>
     value
       .replace(/&/g, '&amp;')
@@ -483,11 +537,13 @@ function renderAuthorizeForm(params: URLSearchParams, error?: string) {
         .filter(([key]) => key !== 'password')
         .map(([key, value]) => `<input type="hidden" name="${esc(key)}" value="${esc(value)}" />`)
         .join('\n')}
-      <label>
-        Authorization password
-        <input type="password" name="password" autocomplete="current-password" required />
-      </label>
-      <button type="submit">Authorize</button>
+      ${signedIn
+        ? '<p>You are signed in. Confirm access for this client.</p>'
+        : `<label>
+          Authorization password
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>`}
+      <button type="submit">Authorize client</button>
     </form>
   </main>
 </body>
@@ -601,6 +657,25 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
   app.get('/.well-known/oauth-authorization-server', async () => getOAuthMetadata())
   app.get('/.well-known/openid-configuration', async () => getOAuthMetadata())
 
+  app.get('/oauth/session', async request => ({
+    authenticated: Boolean(getBrowserSession(request))
+  }))
+
+  app.post('/oauth/session', async (request, reply) => {
+    const body = parseBodyForm(request.body)
+    if (!loginPasswordMatches(body.password)) {
+      return reply.code(401).send({ error: 'invalid_credentials' })
+    }
+
+    setBrowserSession(reply)
+    return { authenticated: true }
+  })
+
+  app.delete('/oauth/session', async (_request, reply) => {
+    reply.header('Set-Cookie', sessionCookie('', 0))
+    return { authenticated: false }
+  })
+
   app.get('/oauth/authorize', async (request, reply) => {
     const query = new URLSearchParams(request.url.split('?')[1] ?? '')
     const validation = await validateAuthorizationRequest(Object.fromEntries(query.entries()))
@@ -612,7 +687,7 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.status(400).type('text/html').send(renderAuthorizeForm(query, validation.description))
     }
 
-    return reply.type('text/html').send(renderAuthorizeForm(query))
+    return reply.type('text/html').send(renderAuthorizeForm(query, undefined, Boolean(getBrowserSession(request))))
   })
 
   app.post('/oauth/authorize', async (request, reply) => {
@@ -627,9 +702,12 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.status(400).type('text/html').send(renderAuthorizeForm(query, validation.description))
     }
 
-    if (body.password !== loginPassword()) {
+    const signedIn = Boolean(getBrowserSession(request))
+    if (!signedIn && !loginPasswordMatches(body.password)) {
       return reply.status(401).type('text/html').send(renderAuthorizeForm(query, 'Invalid password'))
     }
+
+    if (!signedIn) setBrowserSession(reply)
 
     const code = await issueAuthorizationCode({
       clientId: validation.value.clientId,

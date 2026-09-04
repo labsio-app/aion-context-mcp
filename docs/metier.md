@@ -1,123 +1,123 @@
-# Doc métier
+# Product documentation
 
-## Objectif
+## Purpose
 
-AION Context MCP sert de mémoire de travail durable pour AION 2.
+AION Context MCP is durable working memory for AION 2 research.
 
-Le système ne décide pas à la place du modèle. Il stocke, retrouve et contredit du contexte utile pour éviter la perte d’information et garder la provenance visible.
+The system does not make decisions for the model. It stores, retrieves, and challenges useful context so information is not lost and provenance stays visible.
 
-## Problème métier
+## Problem
 
-Les échanges de recherche produisent vite:
+Research conversations quickly generate:
 
-- des observations utiles
-- des affirmations non vérifiées
-- des hypothèses
-- des contradictions
-- des sources éparpillées
+- useful observations;
+- unverified claims;
+- hypotheses;
+- contradictions; and
+- scattered sources.
 
-Sans mémoire structurée, le modèle réexplore les mêmes sujets, mélange les niveaux de confiance et perd le fil des divergences entre TW, KR et GLOBAL.
+Without structured memory, the model repeats the same research, mixes confidence levels, and loses track of differences between TW, KR, and GLOBAL.
 
-## Ce que fait le produit
+## What the product does
 
-- Enregistre des sources avec provenance.
-- Enregistre des connaissances durables.
-- Marque les contradictions au lieu d’écraser l’historique.
-- Permet la recherche contextuelle avant toute nouvelle décision.
-- Sépare les informations par applicabilité: `GLOBAL`, `TW`, `KR`, `UNKNOWN`.
-- Expose un MCP pour que ChatGPT ou un autre hôte puisse consulter et enrichir cette mémoire.
+- Records sources with provenance.
+- Records durable knowledge.
+- Marks contradictions instead of overwriting history.
+- Provides contextual search before a new decision is made.
+- Separates information by applicability: `GLOBAL`, `TW`, `KR`, `UNKNOWN`.
+- Exposes an MCP so ChatGPT or another host can consult and enrich this memory.
 
-## Corpus métier
+## Source corpus
 
-Le corpus métier récent est stocké dans [`references/`](../references/README.md) et doit être traité comme source canon.
+The current product corpus is stored in [`references/`](../references/README.md) and is the canonical source.
 
-Ordre de lecture:
+Recommended reading order:
 
-1. Dossier consolidé
-2. Registre des sources
+1. Consolidated dossier
+2. Source register
 3. Global Launch
 4. Theorycraft / progression / stats
 5. Classes / PvP
 
-Règle de formalisation:
+Formalization rules:
 
-- Le corpus reste la matière première.
-- `docs/metier.md` reste la synthèse stable et lisible.
-- Les changements de fond doivent d’abord apparaître dans le corpus, puis être reflétés dans la synthèse.
-- Toute dérivation doit conserver le scope et la provenance.
+- The corpus remains the raw material.
+- `docs/metier.md` remains the stable, readable summary.
+- Substantive changes must first appear in the corpus, then be reflected in the summary.
+- Every derivation must retain its scope and provenance.
 
-## Ce que le produit ne fait pas
+## What the product does not do
 
-- Ne remplace pas le raisonnement du modèle.
-- Ne prétend pas établir une vérité absolue.
-- Ne scrape pas YouTube de façon agressive.
-- Ne gère pas une connaissance sans provenance.
-- Ne mélange pas automatiquement TW/KR avec Global.
+- Replace model reasoning.
+- Claim an absolute truth.
+- Aggressively scrape YouTube.
+- Manage knowledge without provenance.
+- Automatically generalize TW/KR information to Global.
 
-## Acteurs
+## Actors
 
-- Modèle: décide quoi chercher, interprète, synthétise, détecte les contradictions.
-- MCP: persiste, récupère, expose la provenance, enregistre les challenges.
-- Worker: exécute l’acquisition déterministe de sources.
-- Hôte LLM: ChatGPT, Claude, Cursor ou autre client MCP.
+- Model: decides what to search, interprets, synthesizes, and detects contradictions.
+- MCP: persists, retrieves, exposes provenance, and records challenges.
+- Worker: runs deterministic source acquisition.
+- LLM host: ChatGPT, Claude, Cursor, or another MCP client.
 
-## Objets métier
+## Domain objects
 
-- `Source`: origine d’une information.
-- `KnowledgeItem`: fait, observation, hypothèse ou recommandation durable.
-- `Challenge`: contradiction, limite ou contre-preuve sur une connaissance existante.
-- `AcquisitionJob`: tâche de récupération différée pour une URL.
+- `Source`: origin of information.
+- `KnowledgeItem`: durable fact, observation, hypothesis, or recommendation.
+- `Challenge`: contradiction, limitation, or counter-evidence against existing knowledge.
+- `AcquisitionJob`: deferred acquisition task for a URL.
 
-## Règles métier
+## Business rules
 
-1. Toujours chercher le contexte existant avant de réinventer.
-2. Ne jamais déduire silencieusement du TW/KR vers le GLOBAL.
-3. Séparer `OBSERVATION`, `CLAIM`, `THEORY`, `RECOMMENDATION`.
-4. Préférer une source liée à une assertion isolée.
-5. Si une nouvelle preuve contredit l’existant, créer un `Challenge` au lieu d’écraser l’ancien contenu.
-6. Conserver les données utiles et durables, pas le bruit conversationnel.
-7. Garder l’auth MCP explicite et vérifiable.
+1. Always search existing context before reinventing it.
+2. Never silently infer GLOBAL information from TW/KR information.
+3. Keep `OBSERVATION`, `CLAIM`, `THEORY`, and `RECOMMENDATION` distinct.
+4. Prefer a source-linked assertion over an isolated assertion.
+5. When new evidence conflicts with existing information, create a `Challenge` rather than overwrite the older content.
+6. Keep durable, useful data—not conversational noise.
+7. Keep MCP authentication explicit and verifiable.
 
-## Cas d’usage
+## Use cases
 
-### 1. Recherche avant réponse
+### 1. Research before answering
 
-Le modèle lance une recherche de contexte, inspecte les sources et répond avec la meilleure synthèse disponible.
+The model searches context, reviews sources, and responds with the best available synthesis.
 
-### 2. Enregistrement d’une source
+### 2. Recording a source
 
-Un humain ou le modèle enregistre une page, une note ou un transcript, avec un scope et un titre clairs.
+A person or the model records a page, note, or transcript with a clear scope and title.
 
-### 3. Consolidation du savoir
+### 3. Consolidating knowledge
 
-Après validation, des observations répétées deviennent des items de connaissance plus stables.
+After validation, recurring observations become more stable knowledge items.
 
-### 4. Gestion des contradictions
+### 4. Handling contradictions
 
-Une source nouvelle contredit une hypothèse existante. L’ancien item reste, un challenge est ajouté, et l’arbitrage reste visible.
+A new source contradicts an existing hypothesis. The original item remains, a challenge is added, and the decision stays visible.
 
-## Critères d’acceptation
+## Acceptance criteria
 
-- Le système garde la provenance des informations.
-- Les scopes restent séparés.
-- Les contradictions ne suppriment pas l’historique.
-- Le MCP est utilisable depuis un hôte externe.
-- La documentation indique clairement comment connecter et utiliser le serveur.
+- The system retains information provenance.
+- Scopes remain separate.
+- Contradictions do not delete history.
+- The MCP can be used from an external host.
+- Documentation clearly explains how to connect to and use the server.
 
-## Non-objectifs
+## Non-goals
 
-- Construire un framework d’agent complet.
-- Remplacer le jugement du modèle.
-- Introduire de la complexité d’orchestration sans besoin métier.
-- Mettre en place une base vectorielle avant d’en avoir l’usage.
+- Building a full agent framework.
+- Replacing model judgment.
+- Introducing orchestration complexity without a product need.
+- Adding a vector database before it is needed.
 
-## Glossaire
+## Glossary
 
-- `GLOBAL`: valable sans dépendre d’une région particulière.
-- `TW`: spécifique à Taiwan.
-- `KR`: spécifique à la Corée.
-- `UNKNOWN`: scope non établi.
-- `OBSERVATION`: constat direct.
-- `CLAIM`: assertion rapportée.
-- `THEORY`: explication ou modèle.
-- `RECOMMENDATION`: conseil issu de l’analyse.
+- `GLOBAL`: valid independently of a particular region.
+- `TW`: Taiwan-specific.
+- `KR`: Korea-specific.
+- `UNKNOWN`: scope has not been established.
+- `OBSERVATION`: direct finding.
+- `CLAIM`: reported assertion.
+- `THEORY`: explanation or model.
+- `RECOMMENDATION`: advice derived from analysis.

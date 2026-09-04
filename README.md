@@ -6,7 +6,7 @@ The **LLM stays intelligent**. This project stores, retrieves and challenges con
 
 ## What is in the POC
 
-- Nuxt 4 admin UI + Nitro API.
+- Nuxt 4 public landing page + admin cockpit + Nitro API.
 - Remote MCP server using the official MCP TypeScript SDK v2.
 - PostgreSQL storage.
 - Lexical retrieval (Postgres full-text + similarity) behind a replaceable application port.
@@ -82,7 +82,8 @@ docker compose up -d --build
 
 Then:
 
-- UI: `http://localhost:3000`
+- Landing page: `http://localhost:3000`
+- Admin cockpit: `http://localhost:3000/console`
 - MCP: `http://localhost:3001/mcp`
 - MCP health: `http://localhost:3001/health`
 
@@ -112,10 +113,14 @@ The old bearer-token check is gone. Any MCP client that supports OAuth 2.1 + PKC
 
 ## Connect from T3 Code or another client
 
-1. Point the MCP endpoint to `https://aion-mcp.labsio.app/mcp`.
-2. If the client supports Client ID Metadata Documents, give it a HTTPS `client_id` URL and let it publish its own `redirect_uris`.
-3. If the client uses pre-registration instead, add its redirect URI to `MCP_OAUTH_ALLOWED_REDIRECT_URIS`.
-4. Complete the authorization flow with the password configured in `MCP_OAUTH_PASSWORD`.
+1. Open `https://aion-mcp.labsio.app` and sign in with `MCP_OAUTH_PASSWORD`. This creates a browser-only OAuth session.
+2. In T3 Code, ChatGPT, or another client, add the remote MCP endpoint `https://aion-mcp.labsio.app/mcp`.
+3. The client redirects back to the landing page for OAuth. Review and approve its authorization request.
+4. Ask the client to call `aion_search_context` before answering an AION 2 question.
+
+The landing page includes a copyable URL and generic configuration example. A signed-in browser session removes the need to type the password again when a client asks for authorization; approval remains explicit.
+
+If the client supports Client ID Metadata Documents, give it an HTTPS `client_id` URL and let it publish its own `redirect_uris`. If it uses pre-registration instead, add its redirect URI to `MCP_OAUTH_ALLOWED_REDIRECT_URIS`.
 
 Example for a pre-registered client:
 
@@ -134,24 +139,29 @@ curl -s -X POST http://127.0.0.1:3001/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
 
-## VPS + existing Caddy
+## VPS + Caddy routing
 
-The containers bind only to localhost. Example:
+The containers bind only to localhost. The public domain serves both the landing page and the MCP server: the landing page is the fallback, while MCP, OAuth, discovery, and health routes go to port 3001.
 
 ```caddyfile
-aion.example.com {
-    reverse_proxy 127.0.0.1:3000
-}
+aion-mcp.labsio.app {
+    @mcp_routes path /mcp /mcp/* /health /.well-known/* /oauth/*
+    handle @mcp_routes {
+        reverse_proxy 127.0.0.1:3001
+    }
 
-aion-mcp.example.com {
-    reverse_proxy 127.0.0.1:3001
+    handle {
+        reverse_proxy 127.0.0.1:3000
+    }
 }
 ```
 
 Set:
 
 ```env
-MCP_ALLOWED_HOSTS=localhost,127.0.0.1,aion-mcp.example.com
+MCP_OAUTH_ISSUER=https://aion-mcp.labsio.app
+MCP_OAUTH_RESOURCE=https://aion-mcp.labsio.app
+MCP_ALLOWED_HOSTS=localhost,127.0.0.1,aion-mcp.labsio.app
 ```
 
 Then:
