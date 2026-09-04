@@ -73,7 +73,7 @@ jobs:
           echo "APP_COMMIT_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
 
       - name: Build and restart
-        run: docker compose up -d --build --remove-orphans
+        run: docker compose --env-file /srv/labsio/projects/aion-context-mcp/.env up -d --build --remove-orphans
 
       - name: Wait for health
         run: |
