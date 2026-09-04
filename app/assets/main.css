@@ -1,8 +1,14 @@
 :root {
   color-scheme: dark;
+  --aion-bg: #070716;
+  --aion-bg-2: #0b0d1f;
+  --aion-text: #f4f1ff;
+  --aion-muted: #ada7ca;
+  --aion-accent: #8e6fff;
+  --aion-accent-2: #57d8ff;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #080a11;
-  color: #eef0f7;
+  background: var(--aion-bg);
+  color: var(--aion-text);
 }
 
 * {
@@ -12,9 +18,9 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 15% 0%, rgba(102, 67, 155, 0.22), transparent 32rem),
-    radial-gradient(circle at 85% 10%, rgba(171, 126, 54, 0.16), transparent 30rem),
-    #080a11;
+    radial-gradient(circle at 18% 0%, rgba(142, 111, 255, 0.24), transparent 30rem),
+    radial-gradient(circle at 82% 8%, rgba(87, 216, 255, 0.14), transparent 28rem),
+    linear-gradient(180deg, var(--aion-bg) 0%, var(--aion-bg-2) 100%);
   min-height: 100vh;
 }
 
@@ -30,5 +36,10 @@ button {
 }
 
 a {
-  color: #d6bd86;
+  color: var(--aion-accent-2);
+}
+
+::selection {
+  background: rgba(142, 111, 255, 0.32);
+  color: var(--aion-text);
 }
