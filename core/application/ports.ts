@@ -113,3 +113,35 @@ export interface BetaAccessStore {
   getActiveRequestByDiscordIdentityId(discordIdentityId: string): Promise<BetaAccessRequestRecord | null>
   saveBetaAccessRequest(request: BetaAccessRequestRecord): Promise<BetaAccessRequestRecord>
 }
+
+export type BetaAccessReviewFilter = BetaAccessRequestStatus | 'ALL'
+
+export interface BetaAccessReviewRecord {
+  request: BetaAccessRequestRecord
+  identity: DiscordIdentityRecord
+}
+
+export interface BetaAccessDecisionRecord {
+  id: string
+  betaAccessRequestId: string
+  adminDiscordIdentityId: string
+  fromStatus: BetaAccessRequestStatus
+  toStatus: BetaAccessRequestStatus
+  reason: string | null
+  createdAt: string
+}
+
+export interface BetaAdminStore {
+  listBetaAccessRequests(filter: BetaAccessReviewFilter): Promise<BetaAccessReviewRecord[]>
+  getBetaAccessRequestById(id: string): Promise<BetaAccessReviewRecord | null>
+  transitionBetaAccessRequest(input: {
+    requestId: string
+    adminDiscordIdentityId: string
+    fromStatus: BetaAccessRequestStatus
+    toStatus: BetaAccessRequestStatus
+    reason: string | null
+  }): Promise<{
+    request: BetaAccessReviewRecord
+    decision: BetaAccessDecisionRecord
+  }>
+}
