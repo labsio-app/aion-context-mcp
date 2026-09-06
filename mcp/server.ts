@@ -1,5 +1,9 @@
 import { McpServer } from '@modelcontextprotocol/server'
 import * as z from 'zod/v4'
+import { AcquisitionApplication } from '../core/application/AcquisitionApplication.js'
+import { KnowledgeApplication } from '../core/application/KnowledgeApplication.js'
+import { RecordMcpActivity } from '../core/application/RecordMcpActivity.js'
+import type { McpPrincipal } from '../core/application/McpPrincipal.js'
 import { getContainer } from '../infrastructure/container.js'
 import { getBuildInfo } from '../infrastructure/version.js'
 import {
@@ -57,8 +61,88 @@ Rules:
 - If evidence is insufficient, search again or state what is missing.
 `.trim()
 
-export function createAionMcpServer() {
-  const { knowledge, acquisition } = getContainer()
+export interface AionMcpServerDependencies {
+  principal?: McpPrincipal
+  knowledge?: Pick<
+    KnowledgeApplication,
+    'searchContext' | 'getSource' | 'recordSource' | 'recordKnowledge' | 'recordChallenge' | 'listChallenges'
+  >
+  acquisition?: Pick<AcquisitionApplication, 'enqueueSource'>
+  activity?: Pick<RecordMcpActivity, 'execute'>
+}
+
+function normalizeActivityDuration(startedAt: number): number {
+  return Math.max(0, Math.round(performance.now() - startedAt))
+}
+
+async function recordActivityBestEffort(
+  activity: Pick<RecordMcpActivity, 'execute'>,
+  input: {
+    principal: McpPrincipal
+    toolName: string
+    outcome: 'SUCCESS' | 'FAILURE'
+    durationMs: number
+  }
+) {
+  try {
+    await activity.execute({
+      principal: input.principal,
+      toolName: input.toolName,
+      outcome: input.outcome,
+      durationMs: input.durationMs
+    })
+  } catch (error) {
+    console.error('MCP activity recording failed', {
+      toolName: input.toolName,
+      outcome: input.outcome,
+      error: error instanceof Error ? error.message : String(error)
+    })
+  }
+}
+
+function registerTrackedTool(
+  server: McpServer,
+  context: {
+    principal?: McpPrincipal
+    activity: Pick<RecordMcpActivity, 'execute'>
+  },
+  name: string,
+  config: any,
+  handler: (input: any) => Promise<unknown>
+) {
+  ;(server.registerTool as any)(name, config, async (input: any) => {
+    const startedAt = performance.now()
+    try {
+      const result = await handler(input)
+      if (context.principal) {
+        await recordActivityBestEffort(context.activity, {
+          principal: context.principal,
+          toolName: name,
+          outcome: 'SUCCESS',
+          durationMs: normalizeActivityDuration(startedAt)
+        })
+      }
+      return result
+    } catch (error) {
+      if (context.principal) {
+        await recordActivityBestEffort(context.activity, {
+          principal: context.principal,
+          toolName: name,
+          outcome: 'FAILURE',
+          durationMs: normalizeActivityDuration(startedAt)
+        })
+      }
+
+      throw error
+    }
+  })
+}
+
+export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
+  const container = getContainer()
+  const knowledge = deps.knowledge ?? container.knowledge
+  const acquisition = deps.acquisition ?? container.acquisition
+  const activity = deps.activity ?? container.activity
   const buildInfo = getBuildInfo()
   const server = new McpServer({
     name: 'aion-context',
@@ -67,7 +151,9 @@ export function createAionMcpServer() {
     description: 'Context persistence and retrieval for AION 2 research.'
   })
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_search_context',
     withOAuthSecurity({
       title: 'Search AION context',
@@ -82,7 +168,9 @@ export function createAionMcpServer() {
     async input => jsonResult(await knowledge.searchContext(input))
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_get_source',
     withOAuthSecurity({
       title: 'Get AION source',
@@ -97,7 +185,9 @@ export function createAionMcpServer() {
     }
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_record_source',
     withOAuthSecurity({
       title: 'Record AION source',
@@ -115,7 +205,9 @@ export function createAionMcpServer() {
     async input => jsonResult(await knowledge.recordSource(input))
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_record_knowledge',
     withOAuthSecurity({
       title: 'Record AION knowledge',
@@ -135,7 +227,9 @@ export function createAionMcpServer() {
     async input => jsonResult(await knowledge.recordKnowledge(input))
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_record_challenge',
     withOAuthSecurity({
       title: 'Challenge AION knowledge',
@@ -150,7 +244,9 @@ export function createAionMcpServer() {
     async input => jsonResult(await knowledge.recordChallenge(input))
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_list_open_challenges',
     withOAuthSecurity({
       title: 'List open AION challenges',
@@ -162,7 +258,9 @@ export function createAionMcpServer() {
     async ({ limit }) => jsonResult(await knowledge.listChallenges('OPEN', limit ?? 50))
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_enqueue_source',
     withOAuthSecurity({
       title: 'Queue AION source acquisition',
@@ -201,7 +299,9 @@ export function createAionMcpServer() {
     })
   )
 
-  server.registerTool(
+  registerTrackedTool(
+    server,
+    { principal: deps.principal, activity },
     'aion_get_server_info',
     withOAuthSecurity({
       title: 'Get AION server info',

@@ -89,6 +89,11 @@ Then:
 
 The UI asks for the `NUXT_ADMIN_TOKEN` and keeps it in browser local storage.
 
+For Discord sign-in in production, set `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`,
+and `DISCORD_REDIRECT_URI` in the deployment `.env`. The redirect URI must exactly
+match `https://<public-host>/api/beta/discord/callback` and be registered in the
+Discord application.
+
 ## Check MCP manually
 
 Unauthenticated requests now get an OAuth challenge:
@@ -109,7 +114,8 @@ curl -s https://aion-mcp.labsio.app/.well-known/oauth-protected-resource
 curl -s https://aion-mcp.labsio.app/.well-known/oauth-authorization-server
 ```
 
-The old bearer-token check is gone. Any MCP client that supports OAuth 2.1 + PKCE can connect.
+The old bearer-token check is gone. Legacy stateless MCP tokens without `credentialId` are no longer accepted.
+Reconnect through OAuth to obtain a credential-backed token. Any MCP client that supports OAuth 2.1 + PKCE can connect.
 
 ## Connect from T3 Code or another client
 

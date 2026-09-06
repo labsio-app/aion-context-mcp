@@ -1,12 +1,19 @@
 import { createMcpFastifyApp } from '@modelcontextprotocol/fastify'
 import { toNodeHandler } from '@modelcontextprotocol/node'
 import { createMcpHandler } from '@modelcontextprotocol/server'
+import { McpCredentialApplication } from '../core/application/McpCredentialApplication.js'
+import type { McpPrincipal } from '../core/application/McpPrincipal.js'
 import { getBuildInfo } from '../infrastructure/version.js'
+import { PostgresBetaAccessStore } from '../infrastructure/postgres/PostgresBetaAccessStore.js'
+import { PostgresDiscordBetaStore } from '../infrastructure/postgres/PostgresDiscordBetaStore.js'
+import { PostgresMcpCredentialStore } from '../infrastructure/postgres/PostgresMcpCredentialStore.js'
+import { getPool } from '../infrastructure/postgres/pool.js'
 import { createAionMcpServer } from './server.js'
 import {
   authenticateMcpRequest,
   registerOAuthRoutes,
-  sendMcpAuthChallenge
+  sendMcpAuthChallenge,
+  sendMcpForbidden
 } from './oauth.js'
 
 const host = process.env.MCP_HOST ?? '0.0.0.0'
@@ -45,17 +52,43 @@ app.addContentTypeParser(
   }
 )
 
-await registerOAuthRoutes(app)
+const pool = getPool()
+const discordStore = new PostgresDiscordBetaStore(pool)
+const betaAccessStore = new PostgresBetaAccessStore(pool)
+const mcpCredentialStore = new PostgresMcpCredentialStore(pool)
+const mcpCredentialApplication = new McpCredentialApplication(
+  betaAccessStore,
+  mcpCredentialStore
+)
+
+await registerOAuthRoutes(app, {
+  discordStore,
+  betaAccessStore,
+  mcpCredentialApplication
+})
 
 app.addHook('onRequest', async (request, reply) => {
   if (!request.url.startsWith('/mcp')) return
 
-  if (!authenticateMcpRequest(request)) {
+  const result = await authenticateMcpRequest(request, {
+    credentialStore: mcpCredentialStore,
+    betaAccessStore
+  })
+
+  if (result.kind !== 'authenticated') {
+    if (result.kind === 'forbidden') {
+      return sendMcpForbidden(reply)
+    }
+
     return sendMcpAuthChallenge(reply)
   }
+
+  ;(request.raw as any).auth = result.principal as McpPrincipal
 })
 
-const handler = createMcpHandler(() => createAionMcpServer())
+const handler = createMcpHandler(({ authInfo }) =>
+  createAionMcpServer({ principal: authInfo as McpPrincipal | undefined })
+)
 const nodeHandler = toNodeHandler(handler, {
   onerror: error => console.error('MCP adapter error', error)
 })

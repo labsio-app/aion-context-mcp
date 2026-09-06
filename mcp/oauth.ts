@@ -1,5 +1,13 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
+import type { BetaAccessStore, DiscordBetaStore, McpCredentialStore } from '../core/application/ports.js'
+import { McpCredentialApplication } from '../core/application/McpCredentialApplication.js'
+import { McpCredentialAuthorizationDeniedError } from '../core/application/McpCredentialAuthorizationDeniedError.js'
+import { McpAuthenticationFailedError } from '../core/application/McpAuthenticationFailedError.js'
+import { McpAuthorizationDeniedError } from '../core/application/McpAuthorizationDeniedError.js'
+import { ResolveMcpPrincipal } from '../core/application/ResolveMcpPrincipal.js'
+import type { McpPrincipal } from '../core/application/McpPrincipal.js'
+import type { VerifiedMcpJwtClaims } from '../core/application/ResolveMcpPrincipal.js'
 import { getPool } from '../infrastructure/postgres/pool.js'
 
 const scopeName = 'mcp:access'
@@ -38,6 +46,10 @@ function base64UrlDecode(input: string): Buffer {
 
 function sha256Base64Url(value: string): string {
   return base64UrlEncode(createHash('sha256').update(value).digest())
+}
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex')
 }
 
 function timingSafeEqualText(a: string, b: string): boolean {
@@ -269,10 +281,31 @@ interface AuthCodeRecord {
   redirectUri: string
   scope: string
   resource: string
+  discordIdentityId: string | null
   codeChallenge: string
   codeChallengeMethod: 'S256'
   createdAt: string
   expiresAt: string
+}
+
+interface OAuthAuthorizationCodeStore {
+  insert(record: AuthCodeRecord): Promise<void>
+  consume(code: string): Promise<AuthCodeRecord | null>
+}
+
+export interface OAuthRouteDependencies {
+  discordStore?: DiscordBetaStore
+  betaAccessStore?: BetaAccessStore
+  mcpCredentialApplication?: McpCredentialApplication
+  authorizationCodeStore?: OAuthAuthorizationCodeStore
+  issueAccessToken?: (input: {
+    issuer: string
+    resource: string
+    scope: string
+    issuedAt: number
+    expiresIn: number
+    credentialId: string
+  }) => string | Promise<string>
 }
 
 type AuthorizationValidation =
@@ -351,6 +384,26 @@ function signJwt(payload: Record<string, unknown>): string {
   return `${signingInput}.${base64UrlEncode(signature)}`
 }
 
+function issueCredentialBoundMcpAccessToken(input: {
+  issuer: string
+  resource: string
+  scope: string
+  issuedAt: number
+  expiresIn: number
+  credentialId: string
+}): string {
+  return signJwt({
+    iss: input.issuer,
+    sub: 'aion-owner',
+    aud: input.resource,
+    scope: input.scope,
+    iat: input.issuedAt,
+    exp: input.issuedAt + input.expiresIn,
+    jti: input.credentialId,
+    credentialId: input.credentialId
+  })
+}
+
 function getBrowserSession(request: FastifyRequest): Record<string, unknown> | null {
   const token = getCookie(request, browserSessionCookieName)
   if (!token) return null
@@ -373,6 +426,32 @@ function setBrowserSession(reply: FastifyReply) {
 
 function loginPasswordMatches(candidate: unknown): boolean {
   return typeof candidate === 'string' && timingSafeEqualText(candidate, loginPassword())
+}
+
+async function resolveApprovedDiscordIdentityId(
+  request: FastifyRequest,
+  deps: OAuthRouteDependencies | undefined
+): Promise<string | null> {
+  if (!deps?.discordStore) return null
+
+  const token = getCookie(request, 'aion_discord_session')
+  if (!token) return null
+
+  const session = await deps.discordStore.getSession(sha256Hex(token))
+  if (!session) return null
+
+  if (!deps.betaAccessStore) {
+    return session.identity.id
+  }
+
+  const requestRecord = await deps.betaAccessStore.getLatestRequestByDiscordIdentityId(
+    session.identity.id
+  )
+  if (!requestRecord || requestRecord.status !== 'APPROVED') {
+    return null
+  }
+
+  return session.identity.id
 }
 
 function verifyJwt(token: string): Record<string, unknown> | null {
@@ -408,74 +487,133 @@ function verifyJwt(token: string): Record<string, unknown> | null {
   return payload
 }
 
-async function insertAuthorizationCode(record: AuthCodeRecord) {
-  const pool = getPool()
-  await pool.query(
-    `INSERT INTO oauth_authorization_codes
-     (code, client_id, redirect_uri, scope, resource, code_challenge, code_challenge_method, created_at, expires_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [
-      record.code,
-      record.clientId,
-      record.redirectUri,
-      record.scope,
-      record.resource,
-      record.codeChallenge,
-      record.codeChallengeMethod,
-      record.createdAt,
-      record.expiresAt
-    ]
-  )
+function normalizeClaim(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
-async function consumeAuthorizationCode(code: string): Promise<AuthCodeRecord | null> {
+function toVerifiedMcpJwtClaims(payload: Record<string, unknown>): VerifiedMcpJwtClaims | null {
+  const iss = normalizeClaim(payload.iss)
+  const scope = normalizeClaim(payload.scope)
+  const aud = payload.aud
+
+  if (!iss || !scope) return null
+  if (!(typeof aud === 'string' || Array.isArray(aud))) return null
+
+  return {
+    ...payload,
+    iss,
+    aud,
+    scope
+  }
+}
+
+function verifyMcpAccessToken(token: string): VerifiedMcpJwtClaims | null {
+  const payload = verifyJwt(token)
+  if (!payload) return null
+
+  const claims = toVerifiedMcpJwtClaims(payload)
+  if (!claims) return null
+
+  const resource = getOAuthResource()
+  const issuer = getOAuthIssuer()
+  if (claims.iss !== issuer) return null
+  if (!audienceMatches(claims.aud, resource)) return null
+  if (!scopeIncludes(claims.scope, scopeName)) return null
+
+  return claims
+}
+
+function createDatabaseAuthorizationCodeStore(): OAuthAuthorizationCodeStore {
   const pool = getPool()
-  const client = await pool.connect()
-  try {
-    await client.query('BEGIN')
-    const result = await client.query(
-      `SELECT code, client_id, redirect_uri, scope, resource, code_challenge, code_challenge_method, created_at, expires_at
-       FROM oauth_authorization_codes
-       WHERE code = $1
-       FOR UPDATE`,
-      [code]
-    )
+  return {
+    async insert(record) {
+      await pool.query(
+        `INSERT INTO oauth_authorization_codes
+         (code, client_id, redirect_uri, scope, resource, discord_identity_id, code_challenge, code_challenge_method, created_at, expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          record.code,
+          record.clientId,
+          record.redirectUri,
+          record.scope,
+          record.resource,
+          record.discordIdentityId,
+          record.codeChallenge,
+          record.codeChallengeMethod,
+          record.createdAt,
+          record.expiresAt
+        ]
+      )
+    },
+    async consume(code) {
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        const result = await client.query(
+          `SELECT code, client_id, redirect_uri, scope, resource, discord_identity_id, code_challenge, code_challenge_method, created_at, expires_at
+           FROM oauth_authorization_codes
+           WHERE code = $1
+           FOR UPDATE`,
+          [code]
+        )
 
-    const row = result.rows[0]
-    if (!row) {
-      await client.query('ROLLBACK')
-      return null
-    }
+        const row = result.rows[0]
+        if (!row) {
+          await client.query('ROLLBACK')
+          return null
+        }
 
-    if (new Date(row.expires_at).getTime() <= Date.now()) {
-      await client.query('DELETE FROM oauth_authorization_codes WHERE code = $1', [code])
-      await client.query('COMMIT')
-      return null
-    }
+        if (new Date(row.expires_at).getTime() <= Date.now()) {
+          await client.query('DELETE FROM oauth_authorization_codes WHERE code = $1', [code])
+          await client.query('COMMIT')
+          return null
+        }
 
-    await client.query('DELETE FROM oauth_authorization_codes WHERE code = $1', [code])
-    await client.query('COMMIT')
-    return {
-      code: row.code,
-      clientId: row.client_id,
-      redirectUri: row.redirect_uri,
-      scope: row.scope,
-      resource: row.resource,
-      codeChallenge: row.code_challenge,
-      codeChallengeMethod: row.code_challenge_method,
-      createdAt: new Date(row.created_at).toISOString(),
-      expiresAt: new Date(row.expires_at).toISOString()
+        await client.query('DELETE FROM oauth_authorization_codes WHERE code = $1', [code])
+        await client.query('COMMIT')
+        return {
+          code: row.code,
+          clientId: row.client_id,
+          redirectUri: row.redirect_uri,
+          scope: row.scope,
+          resource: row.resource,
+          discordIdentityId: row.discord_identity_id == null ? null : String(row.discord_identity_id),
+          codeChallenge: row.code_challenge,
+          codeChallengeMethod: row.code_challenge_method,
+          createdAt: new Date(row.created_at).toISOString(),
+          expiresAt: new Date(row.expires_at).toISOString()
+        }
+      } catch (error) {
+        await client.query('ROLLBACK')
+        throw error
+      } finally {
+        client.release()
+      }
     }
-  } catch (error) {
-    await client.query('ROLLBACK')
-    throw error
-  } finally {
-    client.release()
   }
 }
 
 function oauthChallengeHeader(): string {
   return `Bearer resource_metadata="${getProtectedResourceMetadataUrl()}", scope="${scopeName}"`
+}
+
+export type McpRequestAuthenticationResult =
+  | {
+      kind: 'authenticated'
+      principal: McpPrincipal
+    }
+  | {
+      kind: 'unauthorized'
+    }
+  | {
+      kind: 'forbidden'
+    }
+
+export interface McpRequestAuthenticationDependencies {
+  credentialStore: Pick<McpCredentialStore, 'getCredentialById'>
+  betaAccessStore: Pick<BetaAccessStore, 'getLatestRequestByDiscordIdentityId'>
 }
 
 export function getProtectedResourceMetadataUrl(): string {
@@ -630,17 +768,19 @@ async function issueAuthorizationCode(input: {
   codeChallenge: string
   codeChallengeMethod: 'S256'
   resource: string
+  discordIdentityId: string | null
   scope: string
-}) {
+}, store: OAuthAuthorizationCodeStore) {
   const code = randomToken(32)
   const createdAt = nowIso()
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString()
-  await insertAuthorizationCode({
+  await store.insert({
     code,
     clientId: input.clientId,
     redirectUri: input.redirectUri,
     scope: input.scope,
     resource: input.resource,
+    discordIdentityId: input.discordIdentityId,
     codeChallenge: input.codeChallenge,
     codeChallengeMethod: input.codeChallengeMethod,
     createdAt,
@@ -649,9 +789,20 @@ async function issueAuthorizationCode(input: {
   return code
 }
 
-export async function registerOAuthRoutes(app: FastifyInstance) {
+export async function registerOAuthRoutes(
+  app: FastifyInstance,
+  deps: OAuthRouteDependencies = {}
+) {
   const issuer = getOAuthIssuer()
   const resource = getOAuthResource()
+  const authorizationCodeStore =
+    deps.authorizationCodeStore ?? createDatabaseAuthorizationCodeStore()
+  const issueAccessToken =
+    deps.issueAccessToken ?? issueCredentialBoundMcpAccessToken
+  const hasCredentialLifecycle =
+    Boolean(deps.discordStore) &&
+    Boolean(deps.betaAccessStore) &&
+    Boolean(deps.mcpCredentialApplication)
 
   app.get('/.well-known/oauth-protected-resource', async () => getProtectedResourceMetadata())
   app.get('/.well-known/oauth-authorization-server', async () => getOAuthMetadata())
@@ -687,7 +838,12 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.status(400).type('text/html').send(renderAuthorizeForm(query, validation.description))
     }
 
-    return reply.type('text/html').send(renderAuthorizeForm(query, undefined, Boolean(getBrowserSession(request))))
+    const approvedIdentityId = hasCredentialLifecycle
+      ? await resolveApprovedDiscordIdentityId(request, deps)
+      : null
+    return reply
+      .type('text/html')
+      .send(renderAuthorizeForm(query, undefined, Boolean(getBrowserSession(request) || approvedIdentityId)))
   })
 
   app.post('/oauth/authorize', async (request, reply) => {
@@ -702,12 +858,25 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.status(400).type('text/html').send(renderAuthorizeForm(query, validation.description))
     }
 
-    const signedIn = Boolean(getBrowserSession(request))
-    if (!signedIn && !loginPasswordMatches(body.password)) {
-      return reply.status(401).type('text/html').send(renderAuthorizeForm(query, 'Invalid password'))
-    }
+    const approvedIdentityId = hasCredentialLifecycle
+      ? await resolveApprovedDiscordIdentityId(request, deps)
+      : null
 
-    if (!signedIn) setBrowserSession(reply)
+    if (hasCredentialLifecycle) {
+      if (!approvedIdentityId) {
+        return reply
+          .status(403)
+          .type('text/html')
+          .send(renderAuthorizeForm(query, 'Beta access is not approved.'))
+      }
+    } else {
+      const signedIn = Boolean(getBrowserSession(request))
+      if (!signedIn && !loginPasswordMatches(body.password)) {
+        return reply.status(401).type('text/html').send(renderAuthorizeForm(query, 'Invalid password'))
+      }
+
+      if (!signedIn) setBrowserSession(reply)
+    }
 
     const code = await issueAuthorizationCode({
       clientId: validation.value.clientId,
@@ -715,8 +884,9 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       codeChallenge: validation.value.codeChallenge,
       codeChallengeMethod: validation.value.codeChallengeMethod,
       resource: resource,
+      discordIdentityId: approvedIdentityId,
       scope: validation.value.scope
-    })
+    }, authorizationCodeStore)
 
     const redirect = new URL(validation.value.redirectUri)
     redirect.searchParams.set('code', code)
@@ -748,7 +918,7 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.header('Cache-Control', 'no-store').status(400).send({ error: 'invalid_target' })
     }
 
-    const record = await consumeAuthorizationCode(code)
+    const record = await authorizationCodeStore.consume(code)
     if (
       !record ||
       record.clientId !== clientId ||
@@ -760,38 +930,99 @@ export async function registerOAuthRoutes(app: FastifyInstance) {
       return reply.header('Cache-Control', 'no-store').status(400).send({ error: 'invalid_grant' })
     }
 
+    if (!record.discordIdentityId) {
+      return reply.header('Cache-Control', 'no-store').status(400).send({ error: 'invalid_grant' })
+    }
+
     const issuedAt = Math.floor(Date.now() / 1000)
     const expiresIn = 60 * 60 * 24 * 30
-    const token = signJwt({
-      iss: issuer,
-      sub: 'aion-owner',
-      aud: resource,
-      scope: scopeName,
-      iat: issuedAt,
-      exp: issuedAt + expiresIn
-    })
+    let credential: { id: string } | null = null
+    try {
+      if (!deps.mcpCredentialApplication) {
+        return reply.header('Cache-Control', 'no-store').status(500).send({ error: 'server_error' })
+      }
 
-    return reply.header('Cache-Control', 'no-store').send({
-      access_token: token,
-      token_type: 'Bearer',
-      expires_in: expiresIn,
-      scope: scopeName
-    })
+      credential = await deps.mcpCredentialApplication.authorizeMcpClient({
+        discordIdentityId: record.discordIdentityId,
+        clientId
+      })
+
+      const token = await issueAccessToken({
+        issuer,
+        resource,
+        scope: scopeName,
+        issuedAt,
+        expiresIn,
+        credentialId: credential.id
+      })
+
+      return reply.header('Cache-Control', 'no-store').send({
+        access_token: token,
+        token_type: 'Bearer',
+        expires_in: expiresIn,
+        scope: scopeName
+      })
+    } catch (cause) {
+      let compensationFailure: unknown = null
+      if (credential && deps.mcpCredentialApplication) {
+        try {
+          await deps.mcpCredentialApplication.revokeMcpCredential(credential.id)
+        } catch (error) {
+          compensationFailure = error
+        }
+      }
+
+      if (compensationFailure) {
+        throw compensationFailure
+      }
+
+      if (cause instanceof McpCredentialAuthorizationDeniedError) {
+        return reply.header('Cache-Control', 'no-store').status(400).send({ error: 'invalid_grant' })
+      }
+
+      throw cause
+    }
   })
 }
 
-export function authenticateMcpRequest(request: FastifyRequest) {
+export function sendMcpForbidden(reply: FastifyReply) {
+  return reply.code(403).send({ error: 'forbidden' })
+}
+
+export async function authenticateMcpRequest(
+  request: FastifyRequest,
+  deps: McpRequestAuthenticationDependencies
+): Promise<McpRequestAuthenticationResult> {
   const authorization = request.headers.authorization ?? ''
   const token = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length) : ''
-  if (!token) return false
-  const payload = verifyJwt(token)
-  if (!payload) return false
-  const resource = getOAuthResource()
-  const issuer = getOAuthIssuer()
-  if (!audienceMatches(payload.aud, resource)) return false
-  if (!scopeIncludes(payload.scope, scopeName)) return false
-  if (payload.iss !== issuer) return false
-  return true
+  if (!token) return { kind: 'unauthorized' }
+
+  const payload = verifyMcpAccessToken(token)
+  if (!payload) return { kind: 'unauthorized' }
+
+  try {
+    const principal = await new ResolveMcpPrincipal(
+      deps.credentialStore,
+      deps.betaAccessStore
+    ).execute({
+      claims: payload
+    })
+
+    return {
+      kind: 'authenticated',
+      principal
+    }
+  } catch (error) {
+    if (error instanceof McpAuthenticationFailedError) {
+      return { kind: 'unauthorized' }
+    }
+
+    if (error instanceof McpAuthorizationDeniedError) {
+      return { kind: 'forbidden' }
+    }
+
+    throw error
+  }
 }
 
 export function sendMcpAuthChallenge(reply: FastifyReply) {

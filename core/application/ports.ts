@@ -145,3 +145,74 @@ export interface BetaAdminStore {
     decision: BetaAccessDecisionRecord
   }>
 }
+
+export const mcpCredentialStatuses = ['ACTIVE', 'REVOKED'] as const
+export type McpCredentialStatus = (typeof mcpCredentialStatuses)[number]
+
+export interface McpCredentialRecord {
+  id: string
+  discordIdentityId: string
+  oauthClientId: string
+  status: McpCredentialStatus
+  issuedAt: string
+  revokedAt: string | null
+  lastUsedAt: string | null
+}
+
+export interface McpCredentialStore {
+  createCredential(credential: McpCredentialRecord): Promise<McpCredentialRecord>
+  getCredentialById(id: string): Promise<McpCredentialRecord | null>
+  revokeCredential(id: string): Promise<McpCredentialRecord | null>
+}
+
+export const mcpActivityOutcomes = ['SUCCESS', 'FAILURE'] as const
+export type McpActivityOutcome = (typeof mcpActivityOutcomes)[number]
+
+export interface McpActivityRecord {
+  id: string
+  userId: string
+  credentialId: string | null
+  authenticationMethod: 'OAUTH'
+  toolName: string
+  outcome: McpActivityOutcome
+  durationMs: number | null
+  createdAt: string
+}
+
+export interface McpActivityStore {
+  saveActivity(activity: McpActivityRecord): Promise<McpActivityRecord>
+  listActivityForUser(userId: string, limit: number): Promise<McpActivityRecord[]>
+}
+
+export interface MyMcpCredentialRecord {
+  id: string
+  oauthClientId: string
+  status: McpCredentialStatus
+  issuedAt: string
+  revokedAt: string | null
+  lastUsedAt: string | null
+}
+
+export interface MyBetaAccessStatusRecord {
+  status: BetaAccessRequestStatus | 'NONE'
+  requestId: string | null
+  updatedAt: string | null
+}
+
+export interface MyAccountRecord {
+  identity: {
+    id: string
+    discordUserId: string
+    displayName: string
+  }
+  betaStatus: MyBetaAccessStatusRecord
+  mcpCredentials: MyMcpCredentialRecord[]
+}
+
+export interface AccountLifecycleStore {
+  getMyAccount(identityId: string): Promise<MyAccountRecord | null>
+  listMyMcpCredentials(identityId: string): Promise<MyMcpCredentialRecord[]>
+  revokeMyMcpCredential(identityId: string, credentialId: string): Promise<MyMcpCredentialRecord | null>
+  revokeAllMyMcpCredentials(identityId: string): Promise<MyMcpCredentialRecord[]>
+  deleteMyBetaAccount(identityId: string): Promise<void>
+}

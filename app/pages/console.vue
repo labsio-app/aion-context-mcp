@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { postJson } from '../lib/post-json.js'
+
 type Scope = 'GLOBAL' | 'TW' | 'KR' | 'UNKNOWN'
 
 interface ContextBundle {
@@ -39,6 +41,8 @@ const result = ref<ContextBundle | null>(null)
 const busy = ref(false)
 const error = ref('')
 
+const requestOrigin = useRequestURL().origin
+
 const sourceForm = reactive({
   kind: 'YOUTUBE',
   url: '',
@@ -77,6 +81,18 @@ function headers(): HeadersInit | undefined {
   return value ? { Authorization: `Bearer ${value}` } : undefined
 }
 
+async function requestJson<T>(
+  input: string,
+  init: RequestInit = {}
+): Promise<T> {
+  const response = (await fetch(new URL(input, requestOrigin), init)) as Response
+  if (!response.ok) {
+    throw new Error(await response.text())
+  }
+
+  return await response.json()
+}
+
 async function run<T>(action: () => Promise<T>): Promise<T | undefined> {
   busy.value = true
   error.value = ''
@@ -92,26 +108,23 @@ async function run<T>(action: () => Promise<T>): Promise<T | undefined> {
 async function search() {
   if (!query.value.trim()) return
   const data = await run(() =>
-    $fetch<ContextBundle>('/api/context', {
-      headers: headers(),
-      query: {
-        q: query.value,
-        scope: scope.value || undefined
+    requestJson<ContextBundle>(
+      `/api/context?q=${encodeURIComponent(query.value)}${scope.value ? `&scope=${encodeURIComponent(scope.value)}` : ''}`,
+      {
+        headers: headers()
       }
-    })
+    )
   )
   if (data) result.value = data
 }
 
 async function saveSource() {
   const saved = await run(() =>
-    $fetch('/api/sources', {
-      method: 'POST',
-      headers: headers(),
-      body: {
-        ...sourceForm,
-        url: sourceForm.url || null
-      }
+    postJson(requestOrigin, '/api/sources', {
+      ...sourceForm,
+      url: sourceForm.url || null
+    }, {
+      headers: headers()
     })
   )
   if (saved) {
@@ -127,30 +140,31 @@ async function queueSource() {
     return
   }
   await run(() =>
-    $fetch('/api/acquisition', {
+    requestJson('/api/acquisition', {
       method: 'POST',
-      headers: headers(),
-      body: {
+      headers: {
+        ...headers(),
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
         url: sourceForm.url,
         title: sourceForm.title || undefined,
         scope: sourceForm.scope,
         content: sourceForm.content || undefined,
         notes: sourceForm.notes || undefined
-      }
+      })
     })
   )
 }
 
 async function saveKnowledge() {
   const saved = await run(() =>
-    $fetch('/api/knowledge', {
-      method: 'POST',
-      headers: headers(),
-      body: {
-        ...knowledgeForm,
-        tags: knowledgeForm.tags.split(',').map(v => v.trim()).filter(Boolean),
-        sourceIds: knowledgeForm.sourceIds.split(',').map(v => v.trim()).filter(Boolean)
-      }
+    postJson(requestOrigin, '/api/knowledge', {
+      ...knowledgeForm,
+      tags: knowledgeForm.tags.split(',').map(v => v.trim()).filter(Boolean),
+      sourceIds: knowledgeForm.sourceIds.split(',').map(v => v.trim()).filter(Boolean)
+    }, {
+      headers: headers()
     })
   )
   if (saved) {
@@ -163,14 +177,12 @@ async function saveKnowledge() {
 
 async function saveChallenge() {
   const saved = await run(() =>
-    $fetch('/api/challenges', {
-      method: 'POST',
-      headers: headers(),
-      body: {
-        knowledgeId: challengeForm.knowledgeId,
-        objection: challengeForm.objection,
-        sourceId: challengeForm.sourceId || null
-      }
+    postJson(requestOrigin, '/api/challenges', {
+      knowledgeId: challengeForm.knowledgeId,
+      objection: challengeForm.objection,
+      sourceId: challengeForm.sourceId || null
+    }, {
+      headers: headers()
     })
   )
   if (saved) {

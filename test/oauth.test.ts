@@ -1,10 +1,27 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import { createHmac } from 'node:crypto'
 import {
+  authenticateMcpRequest,
   registerOAuthRoutes,
   resetOAuthClientMetadataCache,
   validateAuthorizationRequest
 } from '../mcp/oauth.js'
+
+function createAuthDeps() {
+  return {
+    credentialStore: {
+      async getCredentialById() {
+        return null
+      }
+    },
+    betaAccessStore: {
+      async getLatestRequestByDiscordIdentityId() {
+        return null
+      }
+    }
+  } as const
+}
 
 describe('OAuth authorization', () => {
   beforeEach(() => {
@@ -128,5 +145,41 @@ describe('OAuth browser session', () => {
     } finally {
       await app.close()
     }
+  })
+
+  it.each([
+    ['expired', -3600],
+    ['bad signature', 3600]
+  ] as const)('rejects %s JWTs', async (_label, expDelta) => {
+    vi.stubEnv('MCP_OAUTH_JWT_SECRET', 'test-jwt-secret')
+    vi.stubEnv('MCP_OAUTH_ISSUER', 'https://aion-mcp.labsio.app')
+    vi.stubEnv('MCP_OAUTH_RESOURCE', 'https://aion-mcp.labsio.app')
+
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url')
+    const payload = Buffer.from(
+      JSON.stringify({
+        iss: 'https://aion-mcp.labsio.app',
+        sub: 'aion-owner',
+        aud: 'https://aion-mcp.labsio.app',
+        scope: 'mcp:access',
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + expDelta
+      })
+    ).toString('base64url')
+
+    const secret = expDelta < 0 ? 'test-jwt-secret' : 'wrong-secret'
+    const signature = createHmac('sha256', secret).update(`${header}.${payload}`).digest('base64url')
+    const token = `${header}.${payload}.${signature}`
+
+    const result = await authenticateMcpRequest(
+      {
+        headers: {
+          authorization: `Bearer ${token}`
+        }
+      } as any,
+      createAuthDeps()
+    )
+
+    expect(result.kind).toBe('unauthorized')
   })
 })
