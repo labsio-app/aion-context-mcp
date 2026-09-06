@@ -1197,35 +1197,19 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 .hero-visual { position: relative; min-height: 570px; overflow: visible; }
 .visual-starfield, .visual-horizon { position: absolute; inset: 0; pointer-events: none; }
 .visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.16), transparent 63%); }
-.visual-horizon { top: auto; bottom: 20px; height: 38%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.34), transparent 60%), radial-gradient(ellipse at 65% 85%, rgba(154, 107, 255, 0.24), transparent 58%), radial-gradient(ellipse at 34% 90%, rgba(237, 190, 103, 0.13), transparent 52%); filter: blur(12px); animation: hero-atmosphere 12s ease-in-out infinite; }
-.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); }
-@keyframes hero-atmosphere {
-  0%, 100% { opacity: 0.62; filter: blur(12px) hue-rotate(0deg); }
-  50% { opacity: 1; filter: blur(17px) hue-rotate(28deg); }
+.visual-horizon { top: auto; bottom: 20px; height: 33%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.27), transparent 63%); filter: blur(12px); }
+.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); animation: hero-mark-white-pulse 8s ease-in-out infinite; }
+@keyframes hero-mark-white-pulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); }
+  50% { filter: brightness(1.13) drop-shadow(0 0 28px rgba(255, 255, 255, 0.34)) drop-shadow(0 0 72px rgba(190, 216, 255, 0.3)); }
 }
 .orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
-.orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); animation: orbit-sweep-one 24s linear infinite; }
-.orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); animation: orbit-sweep-two 29s linear infinite; }
-@keyframes orbit-sweep-one {
-  0% { opacity: 0.38; transform: translate(-50%, -50%) rotate(-17deg); box-shadow: 0 0 0 rgba(83, 223, 255, 0); }
-  25% { opacity: 0.82; box-shadow: 0 0 16px rgba(83, 223, 255, 0.18); }
-  50% { opacity: 0.52; transform: translate(-50%, -50%) rotate(73deg); box-shadow: 0 0 5px rgba(83, 223, 255, 0.08); }
-  75% { opacity: 0.94; box-shadow: 0 0 18px rgba(83, 223, 255, 0.22); }
-  100% { opacity: 0.38; transform: translate(-50%, -50%) rotate(343deg); box-shadow: 0 0 0 rgba(83, 223, 255, 0); }
-}
-@keyframes orbit-sweep-two {
-  0% { opacity: 0.32; transform: translate(-50%, -50%) rotate(28deg); box-shadow: 0 0 0 rgba(154, 107, 255, 0); }
-  50% { opacity: 0.82; transform: translate(-50%, -50%) rotate(-62deg); box-shadow: 0 0 17px rgba(154, 107, 255, 0.2); }
-  100% { opacity: 0.32; transform: translate(-50%, -50%) rotate(-332deg); box-shadow: 0 0 0 rgba(154, 107, 255, 0); }
-}
+.orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); }
+.orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); }
 .particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #e7fcff; box-shadow: 0 0 15px 4px rgba(96, 212, 255, 0.62); }
-.particle-one { top: 20%; left: 22%; animation: particle-shimmer 7s ease-in-out infinite; }
-.particle-two { right: 16%; bottom: 27%; background: #a7aaff; animation: particle-shimmer 9s ease-in-out 2s infinite; }
-.particle-three { top: 45%; right: 7%; width: 2px; height: 2px; animation: particle-shimmer 6s ease-in-out 1s infinite reverse; }
-@keyframes particle-shimmer {
-  0%, 100% { opacity: 0.35; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.35); }
-}
+.particle-one { top: 20%; left: 22%; }
+.particle-two { right: 16%; bottom: 27%; background: #a7aaff; }
+.particle-three { top: 45%; right: 7%; width: 2px; height: 2px; }
 
 .values { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(159, 192, 245, 0.18); border-bottom: 1px solid rgba(159, 192, 245, 0.12); }
 .values article { min-height: 172px; padding: 29px 34px 25px 0; }
@@ -1290,6 +1274,6 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .visual-horizon, .orbit-one, .orbit-two, .particle-one, .particle-two, .particle-three { animation: none; }
+  .hero-mark { animation: none; }
 }
 </style>
