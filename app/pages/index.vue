@@ -181,24 +181,84 @@ onMounted(refreshSession)
 
     <section class="hero content-width" aria-labelledby="landing-title">
       <div class="hero-copy">
-        <p class="eyebrow">AION 2 · PRIVATE BETA</p>
-        <h1 id="landing-title">Bring Aion 2 context<br />into your AI workflow.</h1>
-        <p class="lede">
-          Store sources, compare KR / TW / GLOBAL information, and keep open questions alive
-          instead of losing them between prompts.
-        </p>
         <div v-if="!session.authenticated" class="hero-action">
+          <p class="eyebrow">AION 2 · PRIVATE BETA</p>
+          <h1 id="landing-title">Bring Aion 2 context<br />into your AI workflow.</h1>
+          <p class="lede">
+            Store sources, compare KR / TW / GLOBAL information, and keep open questions alive
+            instead of losing them between prompts.
+          </p>
           <p class="access-explanation">
             Clicking starts Discord sign-in. Discord identifies your beta request, which is
             reviewed manually—not approved immediately. We’ll notify you if access is approved.
           </p>
           <a class="button primary" :href="betaStartUrl">Request beta access with Discord</a>
         </div>
-        <p v-else class="identity-note">Signed in with Discord as {{ session.identity?.displayName }}.</p>
+
+        <div v-else-if="accessLoading" class="authenticated-state">
+          <p class="eyebrow">PRIVATE BETA</p>
+          <h1 id="landing-title">Preparing your<br />beta request.</h1>
+          <p class="lede">Checking your Discord identity and current access status.</p>
+        </div>
+
+        <div v-else-if="accessError" class="authenticated-state" role="alert">
+          <p class="eyebrow">PRIVATE BETA</p>
+          <h1 id="landing-title">We couldn’t load<br />your request.</h1>
+          <p class="lede">{{ accessError }}</p>
+        </div>
+
+        <div v-else-if="!requestStatus" class="authenticated-request">
+          <p class="eyebrow">DISCORD VERIFIED · PRIVATE BETA</p>
+          <h1 id="landing-title">Shape the research<br />you want to use.</h1>
+          <p class="lede">
+            Welcome, {{ session.identity?.displayName }}. Tell us how you theorycraft so we can
+            tune the beta around real Aion 2 questions.
+          </p>
+          <form class="beta-form beta-form--hero" @submit.prevent="submitRequest">
+            <label class="field">
+              <span>Display name</span>
+              <input v-model="requestForm.displayName" type="text" required maxlength="120" autocomplete="nickname" />
+            </label>
+            <label class="field">
+              <span>Why do you want to join?</span>
+              <textarea v-model="requestForm.motivation" required rows="3" maxlength="2000" placeholder="What are you exploring in Aion 2?" />
+            </label>
+            <label class="field">
+              <span>How will you use Aion Theory MCP?</span>
+              <textarea v-model="requestForm.intendedUsage" required rows="3" maxlength="2000" placeholder="Mechanics, builds, regional findings…" />
+            </label>
+            <label class="field">
+              <span>Aion 2 profile / experience <em>optional</em></span>
+              <textarea v-model="requestForm.aionProfile" rows="2" maxlength="2000" placeholder="Tell us what you play or study." />
+            </label>
+            <fieldset class="field">
+              <legend>Expected MCP clients <em>optional</em></legend>
+              <div class="checkbox-grid">
+                <label v-for="option in expectedClientOptions" :key="option" class="check-option">
+                  <input v-model="requestForm.expectedClients" type="checkbox" :value="option" />
+                  <span>{{ option }}</span>
+                </label>
+              </div>
+            </fieldset>
+            <p v-if="requestError" class="form-error" role="alert">{{ requestError }}</p>
+            <button type="submit" class="button primary" :disabled="requestBusy || accessLoading">
+              {{ requestBusy ? 'Submitting…' : 'Submit beta request' }}
+            </button>
+          </form>
+          <button type="button" class="sign-out" :disabled="loading" @click="signOut">
+            {{ loading ? 'Signing out…' : 'Sign out' }}
+          </button>
+        </div>
+
+        <div v-else class="authenticated-state">
+          <p class="eyebrow">{{ requestStatus === 'PENDING' ? 'REQUEST SUBMITTED' : 'PRIVATE BETA' }}</p>
+          <h1 id="landing-title">Your Aion 2<br />research is queued.</h1>
+          <p class="lede">Your request is under review. There’s nothing else to do for now—we’ll notify you when access is approved.</p>
+        </div>
       </div>
 
       <div class="hero-side">
-        <aside v-if="session.authenticated" class="beta-panel beta-drawer" aria-live="polite" aria-label="Private beta access">
+        <aside v-if="session.authenticated && requestStatus" class="beta-panel beta-drawer" aria-live="polite" aria-label="Private beta access">
           <div v-if="accessLoading" class="panel-state">
             <p class="panel-kicker">PRIVATE BETA</p>
             <h2>Checking your request.</h2>
@@ -236,45 +296,6 @@ onMounted(refreshSession)
             <p class="panel-kicker">ACCESS STATUS</p>
             <h2>Access is unavailable.</h2>
             <p>Your previous beta access is no longer active.</p>
-          </div>
-
-          <div v-else class="request-panel-content">
-            <div class="request-intro">
-              <p class="panel-kicker">BETA REQUEST</p>
-              <h2>Tell us what you’re researching.</h2>
-              <p>A short player profile helps us review the right mix of theorycrafters.</p>
-            </div>
-            <form class="beta-form" @submit.prevent="submitRequest">
-              <label class="field">
-                <span>Display name</span>
-                <input v-model="requestForm.displayName" type="text" required maxlength="120" autocomplete="nickname" />
-              </label>
-              <label class="field">
-                <span>Why do you want to join?</span>
-                <textarea v-model="requestForm.motivation" required rows="3" maxlength="2000" placeholder="What are you exploring in Aion 2?" />
-              </label>
-              <label class="field">
-                <span>How will you use Aion Theory MCP?</span>
-                <textarea v-model="requestForm.intendedUsage" required rows="3" maxlength="2000" placeholder="Mechanics, builds, regional findings…" />
-              </label>
-              <label class="field">
-                <span>Aion 2 profile / experience</span>
-                <textarea v-model="requestForm.aionProfile" rows="2" maxlength="2000" placeholder="Optional" />
-              </label>
-              <fieldset class="field">
-                <legend>Expected MCP clients</legend>
-                <div class="checkbox-grid">
-                  <label v-for="option in expectedClientOptions" :key="option" class="check-option">
-                    <input v-model="requestForm.expectedClients" type="checkbox" :value="option" />
-                    <span>{{ option }}</span>
-                  </label>
-                </div>
-              </fieldset>
-              <p v-if="requestError" class="form-error" role="alert">{{ requestError }}</p>
-              <button type="submit" class="button primary" :disabled="requestBusy || accessLoading">
-                {{ requestBusy ? 'Submitting…' : 'Submit request' }}
-              </button>
-            </form>
           </div>
 
           <button v-if="!accessLoading && requestStatus !== 'APPROVED'" type="button" class="sign-out" :disabled="loading" @click="signOut">
@@ -1156,9 +1177,17 @@ h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
 h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15rem); letter-spacing: -0.055em; line-height: 0.97; }
 .lede { max-width: 34rem; margin-bottom: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.72; }
-.hero-action { display: grid; justify-items: start; gap: 18px; margin-top: 27px; }
+.hero-action { display: block; }
+.hero-action .access-explanation { margin-top: 27px; }
+.hero-action .button { margin-top: 18px; }
 .access-explanation { max-width: 36rem; margin-bottom: 0; padding-left: 14px; border-left: 1px solid rgba(100, 208, 255, 0.48); color: #8999b2; font-size: 0.82rem; line-height: 1.62; }
 .identity-note { margin: 28px 0 0; color: #8291aa; font-size: 0.8rem; }
+.authenticated-state { max-width: 34rem; }
+.authenticated-request { max-width: 35rem; }
+.authenticated-request h1 { max-width: 11ch; margin-bottom: 18px; font-size: clamp(2.9rem, 4.5vw, 4.35rem); }
+.authenticated-request .lede { margin-bottom: 28px; }
+.beta-form--hero { max-width: 34rem; }
+.field em, .field legend em { color: #71819a; font-size: 0.78em; font-style: normal; font-weight: 500; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; border: 0; border-radius: 8px; padding: 0 19px; cursor: pointer; font: inherit; font-size: 0.9rem; font-weight: 750; text-decoration: none; transition: transform 160ms ease, box-shadow 160ms ease; }
 .button:hover:not(:disabled) { transform: translateY(-2px); }
 .button:disabled { cursor: wait; opacity: 0.65; }
