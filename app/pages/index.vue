@@ -173,7 +173,7 @@ onMounted(refreshSession)
 
     <header class="site-header content-width">
       <NuxtLink class="brand" to="/" aria-label="Aion Theory MCP home">
-        <img class="brand-mark" src="/aion-theory-mark.svg" alt="" />
+              <img class="brand-mark" src="/mark/aion-theory-mark-small.png" alt="" />
         <span class="brand-name">AION THEORY <small>MCP</small></span>
       </NuxtLink>
       <span class="private-beta">Private Beta</span>
@@ -285,7 +285,7 @@ onMounted(refreshSession)
         <div v-else class="hero-visual" aria-hidden="true">
           <div class="visual-starfield" />
           <div class="visual-horizon" />
-          <img class="hero-mark" src="/aion-theory-mark.svg" alt="" />
+          <img class="hero-mark" src="/mark/aion-theory-mark-large.png" alt="Aion Theory" />
           <span class="orbit orbit-one" />
           <span class="orbit orbit-two" />
           <span class="particle particle-one" />
