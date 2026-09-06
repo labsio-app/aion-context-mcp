@@ -173,31 +173,7 @@ onMounted(refreshSession)
 
     <header class="site-header content-width">
       <NuxtLink class="brand" to="/" aria-label="Aion Theory MCP home">
-        <svg class="brand-mark" viewBox="0 0 160 160" fill="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="brand-constellation" x1="24" y1="132" x2="136" y2="28" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#5262ff" />
-              <stop offset=".54" stop-color="#55d6ff" />
-              <stop offset="1" stop-color="#ecfdff" />
-            </linearGradient>
-            <filter id="brand-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
-              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-          <path d="M22 124 50 104 66 70 82 92 106 50 136 30" stroke="url(#brand-constellation)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="m22 124 42 9 34-16 30 7M50 104l14 29M66 70l32 47M82 92l24-42M106 50l22 25" stroke="url(#brand-constellation)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".72" />
-          <path d="M80 18v28M66 32h28" stroke="#dffbff" stroke-width="4" stroke-linecap="round" filter="url(#brand-glow)" />
-          <circle cx="22" cy="124" r="8" fill="#6574ff" />
-          <circle cx="50" cy="104" r="7" fill="#55d6ff" />
-          <circle cx="66" cy="70" r="6" fill="#86e6ff" />
-          <circle cx="82" cy="92" r="10" fill="#f2feff" filter="url(#brand-glow)" />
-          <circle cx="106" cy="50" r="7" fill="#62d8ff" />
-          <circle cx="136" cy="30" r="8" fill="#e6fcff" filter="url(#brand-glow)" />
-          <circle cx="64" cy="133" r="5" fill="#626eff" />
-          <circle cx="98" cy="117" r="6" fill="#58d4ff" />
-          <circle cx="128" cy="124" r="5" fill="#7480ff" />
-        </svg>
+        <img class="brand-mark" src="/aion-theory-mark.svg" alt="" />
         <span class="brand-name">AION THEORY <small>MCP</small></span>
       </NuxtLink>
       <span class="private-beta">Private Beta</span>
@@ -222,7 +198,7 @@ onMounted(refreshSession)
       </div>
 
       <div class="hero-side">
-        <aside v-if="session.authenticated" class="beta-panel" aria-live="polite">
+        <aside v-if="session.authenticated" class="beta-panel beta-drawer" aria-live="polite" aria-label="Private beta access">
           <div v-if="accessLoading" class="panel-state">
             <p class="panel-kicker">PRIVATE BETA</p>
             <h2>Checking your request.</h2>
@@ -309,26 +285,7 @@ onMounted(refreshSession)
         <div v-else class="hero-visual" aria-hidden="true">
           <div class="visual-starfield" />
           <div class="visual-horizon" />
-          <svg class="hero-mark" viewBox="0 0 320 420" fill="none">
-            <defs>
-              <linearGradient id="hero-mark-gradient" x1="66" y1="34" x2="255" y2="383" gradientUnits="userSpaceOnUse">
-                <stop stop-color="#ecfdff" />
-                <stop offset=".42" stop-color="#5bd8ff" />
-                <stop offset="1" stop-color="#7065ff" />
-              </linearGradient>
-              <filter id="hero-mark-glow" x="-60%" y="-40%" width="220%" height="180%">
-                <feGaussianBlur stdDeviation="8" result="blur" />
-                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-              </filter>
-            </defs>
-            <ellipse cx="160" cy="219" rx="126" ry="185" stroke="url(#hero-mark-gradient)" stroke-width="1.5" opacity=".24" />
-            <ellipse cx="160" cy="219" rx="95" ry="144" stroke="#83dcff" stroke-width="1" opacity=".2" transform="rotate(24 160 219)" />
-            <path d="M160 42 91 350l69-49 69 49L160 42Z" fill="#071124" stroke="url(#hero-mark-gradient)" stroke-width="8" stroke-linejoin="round" filter="url(#hero-mark-glow)" />
-            <path d="M160 103 130 244l30-27 30 27-30-141Z" fill="url(#hero-mark-gradient)" opacity=".58" />
-            <path d="M160 122v99M113 249h94" stroke="#effdff" stroke-width="5" stroke-linecap="round" />
-            <circle cx="160" cy="249" r="11" fill="#f4ffff" filter="url(#hero-mark-glow)" />
-            <path d="m113 200-66 43 54-11-39 54 71-49M207 200l66 43-54-11 39 54-71-49" stroke="url(#hero-mark-gradient)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".74" />
-          </svg>
+          <img class="hero-mark" src="/aion-theory-mark.svg" alt="" />
           <span class="orbit orbit-one" />
           <span class="orbit orbit-two" />
           <span class="particle particle-one" />
@@ -1212,7 +1169,7 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 .visual-starfield, .visual-horizon { position: absolute; inset: 0; pointer-events: none; }
 .visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.16), transparent 63%); }
 .visual-horizon { top: auto; bottom: 20px; height: 33%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.27), transparent 63%); filter: blur(12px); }
-.hero-mark { position: absolute; top: 50%; left: 53%; width: min(80%, 390px); height: auto; transform: translate(-50%, -50%); overflow: visible; }
+.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); }
 .orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
 .orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); }
 .orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); }
@@ -1258,7 +1215,7 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
   .lede br { display: none; }
   .hero-side { width: 100%; }
   .hero-visual { min-height: 360px; }
-  .hero-mark { width: min(78%, 300px); }
+  .hero-mark { width: min(72%, 300px); }
   .orbit-one { width: 360px; height: 130px; }
   .orbit-two { width: 330px; height: 110px; }
   .beta-panel { width: 100%; margin: 0; padding: 28px 22px; }

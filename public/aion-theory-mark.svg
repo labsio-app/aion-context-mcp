@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none">
+  <defs>
+    <linearGradient id="aionGradient" x1="44" y1="32" x2="196" y2="202" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#53DFFF"/>
+      <stop offset="0.52" stop-color="#7EA7FF"/>
+      <stop offset="1" stop-color="#9A6BFF"/>
+    </linearGradient>
+  </defs>
+
+  <path
+    d="M120 28 60 190h29l12-35h38l12 35h29L120 28Zm0 63 11 37h-22l11-37Z"
+    fill="url(#aionGradient)"
+  />
+
+  <path
+    d="M52 84c-18 18-27 44-24 71 13-20 30-35 53-45-15-4-25-12-29-26Z"
+    fill="url(#aionGradient)"
+    opacity="0.82"
+  />
+
+  <path
+    d="M188 84c18 18 27 44 24 71-13-20-30-35-53-45 15-4 25-12 29-26Z"
+    fill="url(#aionGradient)"
+    opacity="0.82"
+  />
+
+  <path
+    d="M120 48v24M108 60h24"
+    stroke="#FFFFFF"
+    stroke-width="3"
+    stroke-linecap="round"
+  />
+
+  <circle cx="120" cy="60" r="3.5" fill="#FFFFFF"/>
+</svg>
