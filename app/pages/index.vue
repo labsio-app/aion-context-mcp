@@ -61,6 +61,17 @@ const requestForm = reactive({
 
 const requestStatus = computed(() => accessState.value?.request?.status ?? null)
 
+function formatRequestDate(value: string | undefined): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(date)
+}
+
 function resetRequestForm(displayName = '') {
   requestForm.displayName = displayName
   requestForm.motivation = ''
@@ -158,6 +169,11 @@ async function submitRequest() {
     } else {
       requestError.value = 'Could not submit the request.'
     }
+
+    if (statusMessage === 'active_request_exists' || statusMessage === 'resubmission_not_allowed') {
+      requestError.value = ''
+      await refreshAccess()
+    }
   } finally {
     requestBusy.value = false
   }
@@ -218,6 +234,9 @@ onMounted(refreshSession)
             <p>
               Your request is currently under manual review. There’s nothing else to configure
               yet—we’ll notify you when access is approved and the private portal unlocks.
+            </p>
+            <p v-if="accessState?.request?.createdAt" class="request-date">
+              Request received {{ formatRequestDate(accessState.request.createdAt) }}
             </p>
           </div>
 
@@ -1204,6 +1223,7 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 .panel-state { min-height: 300px; display: flex; flex-direction: column; justify-content: center; padding-block: 28px; }
 .panel-state h2, .request-intro h2 { margin-bottom: 16px; font-size: clamp(2rem, 3vw, 2.65rem); letter-spacing: -0.045em; line-height: 1.04; }
 .panel-state > p:last-child, .request-intro > p:last-child { max-width: 32rem; margin-bottom: 0; color: var(--muted); line-height: 1.65; }
+.panel-state .request-date { margin-top: 22px; color: #7c8ca6; font-size: 0.76rem; letter-spacing: 0.04em; }
 .request-intro { margin-bottom: 27px; }
 .beta-form { display: grid; gap: 15px; }
 .field { display: grid; gap: 7px; min-width: 0; margin: 0; border: 0; padding: 0; }
