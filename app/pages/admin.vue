@@ -209,9 +209,15 @@ onMounted(loadRequests)
 
 <template>
   <main class="admin-shell">
+    <div class="atmosphere atmosphere-cyan" aria-hidden="true" />
+    <div class="atmosphere atmosphere-violet" aria-hidden="true" />
     <section class="admin-surface">
       <header class="admin-header">
         <div>
+          <NuxtLink class="brand" to="/" aria-label="Aion Theory MCP home">
+            <img class="brand-mark" src="/mark/aion-theory-mark-small.png" alt="" />
+            <span class="brand-name">AION THEORY <small>MCP</small></span>
+          </NuxtLink>
           <p class="eyebrow">PRIVATE BETA · ADMIN</p>
           <h1>Beta review console</h1>
           <p class="lede">
@@ -401,18 +407,30 @@ onMounted(loadRequests)
 
 <style scoped>
 .admin-shell {
+  --ink: #050913;
+  --text: #eff5ff;
+  --muted: #9aa9c1;
+  position: relative;
   min-height: 100vh;
-  padding: 28px;
+  overflow: hidden;
+  padding: 30px 0 54px;
+  background:
+    radial-gradient(ellipse 70% 48% at 88% 23%, rgba(98, 80, 197, 0.17), transparent 70%),
+    radial-gradient(ellipse 55% 38% at 13% 13%, rgba(38, 159, 219, 0.12), transparent 70%),
+    var(--ink);
+  color: var(--text);
 }
 
+.atmosphere { position: absolute; width: 38rem; height: 38rem; border-radius: 50%; pointer-events: none; filter: blur(34px); opacity: 0.55; }
+.atmosphere-cyan { top: 8rem; left: -24rem; background: radial-gradient(circle, rgba(52, 200, 255, 0.3), transparent 68%); }
+.atmosphere-violet { top: 5rem; right: -20rem; background: radial-gradient(circle, rgba(128, 91, 255, 0.31), transparent 68%); }
+
 .admin-surface {
-  max-width: 1440px;
+  position: relative;
+  z-index: 1;
+  width: min(1200px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 28px;
-  border: 1px solid rgba(81, 176, 255, 0.18);
-  border-radius: 28px;
-  background: rgba(5, 10, 20, 0.9);
-  box-shadow: 0 20px 90px rgba(0, 0, 0, 0.35);
+  padding: 0;
 }
 
 .admin-header {
@@ -420,8 +438,13 @@ onMounted(loadRequests)
   justify-content: space-between;
   gap: 20px;
   align-items: flex-start;
-  margin-bottom: 18px;
+  margin-bottom: 52px;
 }
+
+.brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 58px; color: #ddecff; text-decoration: none; }
+.brand-mark { width: 38px; height: 38px; filter: drop-shadow(0 0 11px rgba(75, 195, 255, 0.6)); }
+.brand-name { display: grid; font-family: Georgia, serif; font-size: 0.92rem; letter-spacing: 0.13em; line-height: 0.9; }
+.brand-name small { margin-top: 4px; font-family: inherit; font-size: 0.52em; letter-spacing: 0.52em; text-align: center; }
 
 .admin-header h1 {
   margin: 8px 0 12px;
@@ -438,10 +461,9 @@ onMounted(loadRequests)
 
 .admin-chip {
   min-width: 240px;
-  padding: 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(82, 239, 217, 0.14);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 12px 0 0 24px;
+  border-left: 1px solid rgba(107, 213, 255, 0.4);
+  background: transparent;
   color: var(--aion-muted);
   display: grid;
   gap: 6px;
@@ -454,10 +476,9 @@ onMounted(loadRequests)
 
 .notice {
   margin: 0 0 16px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(56, 165, 255, 0.18);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 14px 0;
+  border-left: 1px solid rgba(107, 213, 255, 0.55);
+  background: transparent;
   color: var(--aion-muted);
 }
 
@@ -474,7 +495,9 @@ onMounted(loadRequests)
   justify-content: space-between;
   gap: 16px;
   align-items: end;
-  margin-bottom: 18px;
+  margin-bottom: 26px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(159, 192, 245, 0.14);
 }
 
 .field {
@@ -491,24 +514,26 @@ onMounted(loadRequests)
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid rgba(81, 176, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(4, 7, 16, 0.96);
+  border: 0;
+  border-bottom: 1px solid rgba(81, 176, 255, 0.24);
+  border-radius: 0;
+  background: rgba(4, 7, 16, 0.35);
   color: var(--aion-text);
   padding: 12px 14px;
 }
 
 .ghost,
 .primary {
-  border-radius: 14px;
+  border-radius: 0;
   padding: 12px 16px;
-  border: 1px solid rgba(81, 176, 255, 0.2);
-  background: rgba(255, 255, 255, 0.02);
+  border: 0;
+  border-bottom: 1px solid rgba(81, 176, 255, 0.35);
+  background: transparent;
   color: var(--aion-text);
 }
 
 .primary {
-  border-color: rgba(82, 239, 217, 0.4);
+  border-color: rgba(82, 239, 217, 0.7);
   background: linear-gradient(135deg, rgba(56, 165, 255, 0.92), rgba(82, 239, 217, 0.9));
   color: #04111c;
   font-weight: 800;
@@ -533,11 +558,12 @@ onMounted(loadRequests)
 .list-panel,
 .detail-panel {
   min-height: 620px;
-  padding: 18px;
-  border-radius: 22px;
-  border: 1px solid rgba(81, 176, 255, 0.15);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 0 24px 0 0;
+  border: 0;
+  background: transparent;
 }
+
+.detail-panel { padding: 0 0 0 34px; border-left: 1px solid rgba(159, 192, 245, 0.16); }
 
 .panel-title {
   display: flex;
@@ -559,18 +585,18 @@ onMounted(loadRequests)
   display: grid;
   gap: 8px;
   width: 100%;
-  margin: 0 0 12px;
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(81, 176, 255, 0.14);
-  background: rgba(4, 7, 16, 0.72);
+  margin: 0;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid rgba(159, 192, 245, 0.14);
+  background: transparent;
   color: var(--aion-text);
   text-align: left;
 }
 
 .request-item.active {
-  border-color: rgba(82, 239, 217, 0.55);
-  background: rgba(56, 165, 255, 0.08);
+  border-bottom-color: rgba(82, 239, 217, 0.7);
+  background: linear-gradient(90deg, rgba(56, 165, 255, 0.1), transparent);
 }
 
 .request-item-top {
@@ -637,9 +663,8 @@ onMounted(loadRequests)
 }
 
 .empty {
-  padding: 18px;
-  border-radius: 16px;
-  border: 1px dashed rgba(81, 176, 255, 0.16);
+  padding: 18px 0;
+  border-bottom: 1px dashed rgba(81, 176, 255, 0.2);
   color: var(--aion-muted);
   line-height: 1.6;
 }
@@ -671,5 +696,23 @@ onMounted(loadRequests)
   .span-2 {
     grid-column: span 1;
   }
+
+  .detail-panel {
+    padding: 28px 0 0;
+    border-top: 1px solid rgba(159, 192, 245, 0.16);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .admin-shell { padding-top: 18px; }
+  .admin-surface { width: min(100% - 32px, 520px); }
+  .admin-header { margin-bottom: 36px; }
+  .brand { margin-bottom: 42px; }
+  .admin-header h1 { font-size: clamp(2.5rem, 13vw, 3.6rem); }
+  .admin-chip { padding-left: 14px; }
+  .toolbar { align-items: stretch; grid-template-columns: 1fr; }
+  .toolbar .ghost { justify-self: start; }
+  .list-panel, .detail-panel { min-height: 0; }
 }
 </style>

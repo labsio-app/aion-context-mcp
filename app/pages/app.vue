@@ -306,9 +306,9 @@ async function deleteAccount(confirmationPhrase: string) {
     <section class="portal-shell">
       <header class="portal-topbar">
         <div class="brand-lockup">
-          <span class="brand-mark">A</span>
+          <img class="brand-mark" src="/mark/aion-theory-mark-small.png" alt="" />
           <div>
-            <p>AION MCP</p>
+            <p>AION THEORY <small>MCP</small></p>
             <span>Approved user portal</span>
           </div>
         </div>
@@ -339,8 +339,8 @@ async function deleteAccount(confirmationPhrase: string) {
           <section id="overview" class="panel overview-panel">
             <p v-if="portalErrorMessage" class="notice error" role="alert">{{ portalErrorMessage }}</p>
             <div class="hero-copy">
-              <p class="eyebrow">AION CONTEXT MCP</p>
-              <h1>Your AI reasons. AION MCP remembers.</h1>
+              <p class="eyebrow">AION THEORY MCP</p>
+              <h1>Your AI reasons. AION THEORY remembers.</h1>
               <p class="lede">
                 The portal documents the system as it exists: sources, durable knowledge,
                 contradictions, and the evidence trail behind every answer.
@@ -546,21 +546,25 @@ async function deleteAccount(confirmationPhrase: string) {
 
 <style scoped>
 .portal-page {
+  --ink: #050913;
+  --text: #eff5ff;
+  --muted: #9aa9c1;
+  position: relative;
   min-height: 100vh;
-  padding: 28px 0 44px;
+  overflow: hidden;
+  padding: 30px 0 54px;
+  background:
+    radial-gradient(ellipse 70% 48% at 88% 23%, rgba(98, 80, 197, 0.17), transparent 70%),
+    radial-gradient(ellipse 55% 38% at 13% 13%, rgba(38, 159, 219, 0.12), transparent 70%),
+    var(--ink);
+  color: var(--text);
 }
 
 .portal-shell {
-  width: min(1420px, calc(100% - 32px));
+  position: relative;
+  z-index: 1;
+  width: min(1200px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 24px;
-  border-radius: 30px;
-  border: 1px solid rgba(81, 176, 255, 0.16);
-  background:
-    linear-gradient(180deg, rgba(9, 13, 24, 0.95), rgba(6, 9, 16, 0.98)),
-    radial-gradient(circle at top left, rgba(56, 165, 255, 0.14), transparent 36%),
-    radial-gradient(circle at top right, rgba(82, 239, 217, 0.1), transparent 32%);
-  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.44);
 }
 
 .portal-topbar {
@@ -568,7 +572,7 @@ async function deleteAccount(confirmationPhrase: string) {
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
+  margin-bottom: 52px;
 }
 
 .brand-lockup {
@@ -605,13 +609,9 @@ async function deleteAccount(confirmationPhrase: string) {
 .brand-mark {
   width: 38px;
   height: 38px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  color: #06111c;
-  background: linear-gradient(135deg, var(--aion-accent), var(--aion-accent-2));
-  font-weight: 900;
+  filter: drop-shadow(0 0 11px rgba(75, 195, 255, 0.6));
 }
+.brand-lockup p small { display: block; margin-top: 4px; font-size: 0.52em; letter-spacing: 0.52em; text-align: center; }
 
 .statusline {
   display: flex;
@@ -624,10 +624,9 @@ async function deleteAccount(confirmationPhrase: string) {
 .status-chip {
   display: grid;
   gap: 2px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 8px 0 8px 16px;
+  border-left: 1px solid rgba(107, 213, 255, 0.35);
+  background: transparent;
   min-width: 140px;
 }
 
@@ -654,19 +653,17 @@ async function deleteAccount(confirmationPhrase: string) {
   display: grid;
   gap: 10px;
   align-self: start;
-  padding: 18px;
-  border-radius: 22px;
-  border: 1px solid rgba(82, 239, 217, 0.14);
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0 24px 0 0;
+  border-right: 1px solid rgba(159, 192, 245, 0.16);
+  background: transparent;
 }
 
 .nav-link {
   display: block;
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 10px 0;
   text-decoration: none;
   color: var(--aion-text);
-  background: rgba(255, 255, 255, 0.02);
+  background: transparent;
   transition:
     transform 140ms ease,
     background 140ms ease,
@@ -676,7 +673,8 @@ async function deleteAccount(confirmationPhrase: string) {
 .nav-link:hover,
 .nav-link:focus-visible {
   transform: translateX(2px);
-  background: rgba(56, 165, 255, 0.12);
+  color: #6bd5ff;
+  background: transparent;
   outline: none;
 }
 
@@ -686,12 +684,9 @@ async function deleteAccount(confirmationPhrase: string) {
 }
 
 .panel {
-  padding: 22px;
-  border-radius: 26px;
-  border: 1px solid rgba(82, 239, 217, 0.12);
-  background:
-    linear-gradient(180deg, rgba(11, 16, 29, 0.92), rgba(7, 11, 20, 0.96)),
-    radial-gradient(circle at top left, rgba(56, 165, 255, 0.06), transparent 42%);
+  padding: 0 0 54px;
+  border-bottom: 1px solid rgba(159, 192, 245, 0.14);
+  background: transparent;
 }
 
 .overview-panel {
@@ -744,10 +739,9 @@ async function deleteAccount(confirmationPhrase: string) {
 .info-card,
 .tool-card,
 .reasoning-card {
-  padding: 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 18px 0;
+  border-top: 1px solid rgba(159, 192, 245, 0.14);
+  background: transparent;
 }
 
 .card {
@@ -1131,13 +1125,11 @@ code {
   }
 
   .portal-shell {
-    width: calc(100% - 20px);
-    padding: 18px;
-    border-radius: 24px;
+    width: calc(100% - 32px);
   }
 
   .panel {
-    padding: 18px;
+    padding: 0 0 38px;
   }
 
   .connect-summary {
