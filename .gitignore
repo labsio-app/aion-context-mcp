@@ -6,3 +6,9 @@ node_modules
 coverage
 *.log
 *Zone.Identifier
+
+# Local validation captures and AIDD working notes.
+.artifacts/
+screenshots/
+aidd_docs/
+2523b6ff-6698-4b59-9dbb-62caf0f7e9d2.png
