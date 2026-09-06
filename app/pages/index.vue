@@ -206,29 +206,134 @@ onMounted(refreshSession)
     <section class="hero content-width" aria-labelledby="landing-title">
       <div class="hero-copy">
         <p class="eyebrow">AION 2 · PRIVATE BETA</p>
-        <h1 id="landing-title">Your Aion 2 research,<br />with memory.</h1>
+        <h1 id="landing-title">Bring Aion 2 context<br />into your AI workflow.</h1>
         <p class="lede">
-          Track KR, TW and GLOBAL sources.<br />
-          Keep theories, contradictions and discoveries across AI sessions.
+          Store sources, compare KR / TW / GLOBAL information, and keep open questions alive
+          instead of losing them between prompts.
         </p>
-        <div class="hero-action">
+        <div v-if="!session.authenticated" class="hero-action">
+          <p class="access-explanation">
+            Clicking starts Discord sign-in. Discord identifies your beta request, which is
+            reviewed manually—not approved immediately. We’ll notify you if access is approved.
+          </p>
           <a class="button primary" :href="betaStartUrl">Request beta access with Discord</a>
-          <p>Private beta. Access is reviewed manually.</p>
         </div>
+        <p v-else class="identity-note">Signed in with Discord as {{ session.identity?.displayName }}.</p>
       </div>
 
-      <div class="hero-visual" aria-hidden="true">
-        <div class="visual-starfield" />
-        <div class="visual-horizon" />
-        <div class="memory-rift">
-          <span class="rift-core" />
-          <span class="rift-arc rift-arc-one" />
-          <span class="rift-arc rift-arc-two" />
-          <span class="rift-trace rift-trace-one" />
-          <span class="rift-trace rift-trace-two" />
-          <span class="rift-particle rift-particle-one" />
-          <span class="rift-particle rift-particle-two" />
-          <span class="rift-particle rift-particle-three" />
+      <div class="hero-side">
+        <aside v-if="session.authenticated" class="beta-panel" aria-live="polite">
+          <div v-if="accessLoading" class="panel-state">
+            <p class="panel-kicker">PRIVATE BETA</p>
+            <h2>Checking your request.</h2>
+            <p>Reading your current beta-access status.</p>
+          </div>
+
+          <div v-else-if="accessError" class="panel-state" role="alert">
+            <p class="panel-kicker">PRIVATE BETA</p>
+            <h2>Status unavailable.</h2>
+            <p>{{ accessError }}</p>
+          </div>
+
+          <div v-else-if="requestStatus === 'PENDING'" class="panel-state">
+            <p class="panel-kicker">REQUEST SUBMITTED</p>
+            <h2>You’re on the waiting list.</h2>
+            <p>
+              Your request is currently under manual review. There’s nothing else to configure
+              yet—we’ll notify you when access is approved and the private portal unlocks.
+            </p>
+          </div>
+
+          <div v-else-if="requestStatus === 'APPROVED'" class="panel-state">
+            <p class="panel-kicker">ACCESS APPROVED</p>
+            <h2>Opening your portal.</h2>
+            <p>Your private Aion Theory space is ready.</p>
+          </div>
+
+          <div v-else-if="requestStatus === 'REJECTED'" class="panel-state">
+            <p class="panel-kicker">REQUEST REVIEWED</p>
+            <h2>Access wasn’t approved.</h2>
+            <p>Your current beta request was not approved. No further action is required.</p>
+          </div>
+
+          <div v-else-if="requestStatus === 'REVOKED'" class="panel-state">
+            <p class="panel-kicker">ACCESS STATUS</p>
+            <h2>Access is unavailable.</h2>
+            <p>Your previous beta access is no longer active.</p>
+          </div>
+
+          <div v-else class="request-panel-content">
+            <div class="request-intro">
+              <p class="panel-kicker">BETA REQUEST</p>
+              <h2>Tell us what you’re researching.</h2>
+              <p>A short player profile helps us review the right mix of theorycrafters.</p>
+            </div>
+            <form class="beta-form" @submit.prevent="submitRequest">
+              <label class="field">
+                <span>Display name</span>
+                <input v-model="requestForm.displayName" type="text" required maxlength="120" autocomplete="nickname" />
+              </label>
+              <label class="field">
+                <span>Why do you want to join?</span>
+                <textarea v-model="requestForm.motivation" required rows="3" maxlength="2000" placeholder="What are you exploring in Aion 2?" />
+              </label>
+              <label class="field">
+                <span>How will you use Aion Theory MCP?</span>
+                <textarea v-model="requestForm.intendedUsage" required rows="3" maxlength="2000" placeholder="Mechanics, builds, regional findings…" />
+              </label>
+              <label class="field">
+                <span>Aion 2 profile / experience</span>
+                <textarea v-model="requestForm.aionProfile" rows="2" maxlength="2000" placeholder="Optional" />
+              </label>
+              <fieldset class="field">
+                <legend>Expected MCP clients</legend>
+                <div class="checkbox-grid">
+                  <label v-for="option in expectedClientOptions" :key="option" class="check-option">
+                    <input v-model="requestForm.expectedClients" type="checkbox" :value="option" />
+                    <span>{{ option }}</span>
+                  </label>
+                </div>
+              </fieldset>
+              <p v-if="requestError" class="form-error" role="alert">{{ requestError }}</p>
+              <button type="submit" class="button primary" :disabled="requestBusy || accessLoading">
+                {{ requestBusy ? 'Submitting…' : 'Submit request' }}
+              </button>
+            </form>
+          </div>
+
+          <button v-if="!accessLoading && requestStatus !== 'APPROVED'" type="button" class="sign-out" :disabled="loading" @click="signOut">
+            {{ loading ? 'Signing out…' : 'Sign out' }}
+          </button>
+        </aside>
+
+        <div v-else class="hero-visual" aria-hidden="true">
+          <div class="visual-starfield" />
+          <div class="visual-horizon" />
+          <svg class="hero-mark" viewBox="0 0 320 420" fill="none">
+            <defs>
+              <linearGradient id="hero-mark-gradient" x1="66" y1="34" x2="255" y2="383" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#ecfdff" />
+                <stop offset=".42" stop-color="#5bd8ff" />
+                <stop offset="1" stop-color="#7065ff" />
+              </linearGradient>
+              <filter id="hero-mark-glow" x="-60%" y="-40%" width="220%" height="180%">
+                <feGaussianBlur stdDeviation="8" result="blur" />
+                <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+              </filter>
+            </defs>
+            <ellipse cx="160" cy="219" rx="126" ry="185" stroke="url(#hero-mark-gradient)" stroke-width="1.5" opacity=".24" />
+            <ellipse cx="160" cy="219" rx="95" ry="144" stroke="#83dcff" stroke-width="1" opacity=".2" transform="rotate(24 160 219)" />
+            <path d="M160 42 91 350l69-49 69 49L160 42Z" fill="#071124" stroke="url(#hero-mark-gradient)" stroke-width="8" stroke-linejoin="round" filter="url(#hero-mark-glow)" />
+            <path d="M160 103 130 244l30-27 30 27-30-141Z" fill="url(#hero-mark-gradient)" opacity=".58" />
+            <path d="M160 122v99M113 249h94" stroke="#effdff" stroke-width="5" stroke-linecap="round" />
+            <circle cx="160" cy="249" r="11" fill="#f4ffff" filter="url(#hero-mark-glow)" />
+            <path d="m113 200-66 43 54-11-39 54 71-49M207 200l66 43-54-11 39 54-71-49" stroke="url(#hero-mark-gradient)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".74" />
+          </svg>
+          <span class="orbit orbit-one" />
+          <span class="orbit orbit-two" />
+          <span class="particle particle-one" />
+          <span class="particle particle-two" />
+          <span class="particle particle-three" />
         </div>
       </div>
     </section>
@@ -236,83 +341,19 @@ onMounted(refreshSession)
     <section class="values content-width" aria-label="Aion Theory principles">
       <article>
         <p class="value-number">01</p>
-        <h2>KR / TW / GLOBAL</h2>
-        <p>Keep regional information separated.</p>
+        <h2>Persistent context</h2>
+        <p>Research survives beyond a single chat or agent session.</p>
       </article>
       <article>
         <p class="value-number">02</p>
-        <h2>Sources before certainty</h2>
-        <p>Know what is observed, sourced, inferred or uncertain.</p>
+        <h2>Region-aware research</h2>
+        <p>Compare KR, TW and GLOBAL information without mixing game versions.</p>
       </article>
       <article>
         <p class="value-number">03</p>
-        <h2>Theorycraft that persists</h2>
-        <p>Keep mechanics, builds and contradictions across sessions.</p>
+        <h2>Claims and contradictions</h2>
+        <p>Keep evidence, objections and conclusions together.</p>
       </article>
-    </section>
-
-    <section v-if="session.authenticated" class="beta-flow content-width" aria-live="polite">
-      <div v-if="accessLoading" class="compact-state">Checking your beta access.</div>
-      <div v-else-if="accessError" class="compact-state" role="alert">{{ accessError }}</div>
-      <div v-else-if="requestStatus === 'PENDING'" class="compact-state">
-        <strong>Request pending</strong>
-        <p>Your beta request is currently under review.</p>
-      </div>
-      <div v-else-if="requestStatus === 'APPROVED'" class="compact-state">
-        <strong>Access approved</strong>
-        <p>Opening your Aion Theory workspace.</p>
-      </div>
-      <div v-else-if="requestStatus === 'REJECTED'" class="compact-state">
-        <strong>Request not approved</strong>
-        <p>Your current beta request was not approved.</p>
-      </div>
-      <div v-else-if="requestStatus === 'REVOKED'" class="compact-state">
-        <strong>Access unavailable</strong>
-        <p>Your beta access is no longer active.</p>
-      </div>
-
-      <div v-else class="request-section">
-        <div class="request-intro">
-          <p class="eyebrow">BETA ACCESS</p>
-          <h2>Tell us what you are researching.</h2>
-          <p>Keep it short, direct, and focused on Aion 2.</p>
-        </div>
-        <form class="beta-form" @submit.prevent="submitRequest">
-          <label class="field">
-            <span>Display name</span>
-            <input v-model="requestForm.displayName" type="text" required maxlength="120" autocomplete="nickname" />
-          </label>
-          <label class="field">
-            <span>Why do you want to join?</span>
-            <textarea v-model="requestForm.motivation" required rows="4" maxlength="2000" placeholder="Tell us briefly why you want access." />
-          </label>
-          <label class="field">
-            <span>How do you plan to use Aion Theory MCP?</span>
-            <textarea v-model="requestForm.intendedUsage" required rows="4" maxlength="2000" placeholder="Describe your intended usage." />
-          </label>
-          <label class="field">
-            <span>Aion 2 profile / experience</span>
-            <textarea v-model="requestForm.aionProfile" rows="3" maxlength="2000" placeholder="Optional" />
-          </label>
-          <fieldset class="field">
-            <legend>Expected MCP clients</legend>
-            <div class="checkbox-grid">
-              <label v-for="option in expectedClientOptions" :key="option" class="check-option">
-                <input v-model="requestForm.expectedClients" type="checkbox" :value="option" />
-                <span>{{ option }}</span>
-              </label>
-            </div>
-          </fieldset>
-          <p v-if="requestError" class="form-error" role="alert">{{ requestError }}</p>
-          <button type="submit" class="button primary" :disabled="requestBusy || accessLoading">
-            {{ requestBusy ? 'Submitting…' : 'Submit request' }}
-          </button>
-        </form>
-      </div>
-
-      <button v-if="!accessLoading && requestStatus !== 'APPROVED'" type="button" class="sign-out" :disabled="loading" @click="signOut">
-        {{ loading ? 'Signing out…' : 'Sign out' }}
-      </button>
     </section>
 
     <p v-if="error" class="error content-width" role="alert">{{ error }}</p>
@@ -1151,41 +1192,34 @@ code {
 .private-beta, .eyebrow, .value-number { color: #6bd5ff; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; }
 .private-beta { color: #c3cce0; font-size: 0.66rem; }
 
-.hero { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(440px, 1.05fr); align-items: center; min-height: 650px; padding-block: 46px 56px; }
+.hero { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 0.94fr) minmax(440px, 1.06fr); gap: clamp(44px, 6vw, 92px); align-items: center; min-height: 670px; padding-block: 46px 64px; }
 .hero-copy { position: relative; z-index: 2; padding-bottom: 12px; }
 .eyebrow { margin: 0 0 18px; }
 h1, h2, p { margin-top: 0; }
 h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; }
-h1 { max-width: 11ch; margin-bottom: 24px; font-size: clamp(4rem, 5.6vw, 5.45rem); letter-spacing: -0.055em; line-height: 0.96; }
+h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15rem); letter-spacing: -0.055em; line-height: 0.97; }
 .lede { max-width: 34rem; margin-bottom: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.72; }
-.hero-action { display: grid; justify-items: start; gap: 13px; margin-top: 30px; }
-.hero-action p { margin-bottom: 0; color: #8291aa; font-size: 0.8rem; }
+.hero-action { display: grid; justify-items: start; gap: 18px; margin-top: 27px; }
+.access-explanation { max-width: 36rem; margin-bottom: 0; padding-left: 14px; border-left: 1px solid rgba(100, 208, 255, 0.48); color: #8999b2; font-size: 0.82rem; line-height: 1.62; }
+.identity-note { margin: 28px 0 0; color: #8291aa; font-size: 0.8rem; }
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; border: 0; border-radius: 8px; padding: 0 19px; cursor: pointer; font: inherit; font-size: 0.9rem; font-weight: 750; text-decoration: none; transition: transform 160ms ease, box-shadow 160ms ease; }
 .button:hover:not(:disabled) { transform: translateY(-2px); }
 .button:disabled { cursor: wait; opacity: 0.65; }
 .primary { color: #f8fbff; background: linear-gradient(105deg, #287cef, #5b5aff); box-shadow: 0 13px 30px rgba(48, 86, 255, 0.35), inset 0 1px rgba(255, 255, 255, 0.26); }
 
+.hero-side { position: relative; min-width: 0; }
 .hero-visual { position: relative; min-height: 570px; overflow: visible; }
 .visual-starfield, .visual-horizon { position: absolute; inset: 0; pointer-events: none; }
-.visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.14), transparent 63%); }
+.visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.16), transparent 63%); }
 .visual-horizon { top: auto; bottom: 20px; height: 33%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.27), transparent 63%); filter: blur(12px); }
-.aion-sigil { position: absolute; top: 50%; left: 53%; width: min(100%, 500px); height: auto; transform: translate(-50%, -49%); overflow: visible; }
-.sigil-shadow { fill: rgba(80, 130, 255, 0.06); filter: url(#sigil-glow); }
-.sigil-line { stroke: url(#sigil-stroke); stroke-width: 3; filter: url(#sigil-glow); }
-.sigil-inner { stroke-width: 1.8; opacity: 0.82; }
-.sigil-cross { stroke-width: 1.5; opacity: 0.66; }
-.sigil-wing { fill: url(#sigil-stroke); opacity: 0.18; filter: url(#sigil-glow); }
-.sigil-star { fill: #effbff; filter: url(#sigil-glow); }
-.memory-rift { position: absolute; inset: 5% 5% 2%; overflow: hidden; }
-.rift-core { position: absolute; inset: 8% 48% 10%; width: 4px; border-radius: 999px; background: linear-gradient(180deg, transparent, #d6fbff 25%, #5bd8ff 50%, #705fff 76%, transparent); box-shadow: 0 0 18px #64d8ff, 0 0 80px rgba(85, 170, 255, 0.6); }
-.rift-arc { position: absolute; border: 1px solid rgba(130, 204, 255, 0.38); border-radius: 50%; filter: drop-shadow(0 0 15px rgba(86, 177, 255, 0.24)); }
-.rift-arc-one { width: 420px; height: 150px; top: 31%; left: 7%; transform: rotate(-19deg); border-right-color: transparent; }
-.rift-arc-two { width: 370px; height: 128px; top: 49%; right: 1%; transform: rotate(26deg); border-left-color: transparent; border-color: rgba(131, 106, 255, 0.38); }
-.rift-trace { position: absolute; height: 1px; background: linear-gradient(90deg, transparent, rgba(141, 220, 255, 0.84), transparent); transform-origin: left center; }
-.rift-trace-one { width: 290px; top: 34%; left: 19%; transform: rotate(26deg); }
-.rift-trace-two { width: 240px; top: 65%; left: 43%; transform: rotate(-27deg); }
-.rift-particle { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #e7fcff; box-shadow: 0 0 15px 4px rgba(96, 212, 255, 0.62); }
-.rift-particle-one { top: 24%; left: 31%; }.rift-particle-two { top: 69%; right: 23%; background: #9da5ff; }.rift-particle-three { top: 48%; right: 10%; width: 3px; height: 3px; }
+.hero-mark { position: absolute; top: 50%; left: 53%; width: min(80%, 390px); height: auto; transform: translate(-50%, -50%); overflow: visible; }
+.orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
+.orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); }
+.orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); }
+.particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #e7fcff; box-shadow: 0 0 15px 4px rgba(96, 212, 255, 0.62); }
+.particle-one { top: 20%; left: 22%; }
+.particle-two { right: 16%; bottom: 27%; background: #a7aaff; }
+.particle-three { top: 45%; right: 7%; width: 2px; height: 2px; }
 
 .values { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(159, 192, 245, 0.18); border-bottom: 1px solid rgba(159, 192, 245, 0.12); }
 .values article { min-height: 172px; padding: 29px 34px 25px 0; }
@@ -1194,24 +1228,24 @@ h1 { max-width: 11ch; margin-bottom: 24px; font-size: clamp(4rem, 5.6vw, 5.45rem
 .values h2 { margin-bottom: 10px; font-family: inherit; font-size: 1rem; font-weight: 700; letter-spacing: 0.01em; }
 .values article > p:last-child { max-width: 25rem; margin-bottom: 0; color: var(--muted); font-size: 0.91rem; line-height: 1.55; }
 
-.beta-flow { position: relative; z-index: 1; padding-block: 96px 22px; }
-.compact-state { max-width: 560px; margin-inline: auto; border-left: 1px solid #63c9ff; padding: 2px 0 2px 20px; color: var(--muted); line-height: 1.55; }
-.compact-state strong { display: block; color: var(--text); font-weight: 700; }
-.compact-state p { margin: 5px 0 0; }
-.request-section { display: grid; grid-template-columns: minmax(220px, 0.7fr) minmax(0, 1fr); gap: clamp(42px, 8vw, 110px); align-items: start; max-width: 920px; margin-inline: auto; padding: 40px; border: 1px solid rgba(130, 166, 225, 0.19); background: rgba(9, 15, 30, 0.52); }
-.request-intro h2 { margin-bottom: 14px; font-size: clamp(2rem, 3vw, 2.8rem); letter-spacing: -0.045em; line-height: 1.02; }
-.request-intro > p:last-child { color: var(--muted); line-height: 1.6; }
-.beta-form { display: grid; gap: 17px; }
+.beta-panel { position: relative; width: min(100%, 540px); margin-left: auto; border: 1px solid rgba(130, 177, 238, 0.2); padding: clamp(28px, 3.2vw, 42px); background: linear-gradient(145deg, rgba(10, 18, 35, 0.93), rgba(6, 10, 22, 0.96)); box-shadow: 0 34px 90px rgba(0, 0, 0, 0.32), inset 0 1px rgba(255, 255, 255, 0.035); }
+.beta-panel::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 1px; background: linear-gradient(180deg, transparent, rgba(91, 214, 255, 0.75), rgba(112, 92, 255, 0.45), transparent); }
+.panel-kicker { margin: 0 0 16px; color: #6bd5ff; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; }
+.panel-state { min-height: 300px; display: flex; flex-direction: column; justify-content: center; padding-block: 28px; }
+.panel-state h2, .request-intro h2 { margin-bottom: 16px; font-size: clamp(2rem, 3vw, 2.65rem); letter-spacing: -0.045em; line-height: 1.04; }
+.panel-state > p:last-child, .request-intro > p:last-child { max-width: 32rem; margin-bottom: 0; color: var(--muted); line-height: 1.65; }
+.request-intro { margin-bottom: 27px; }
+.beta-form { display: grid; gap: 15px; }
 .field { display: grid; gap: 7px; min-width: 0; margin: 0; border: 0; padding: 0; }
 .field > span, .field legend { color: #d7e2f4; font-size: 0.82rem; font-weight: 700; }
-.field input, .field textarea { width: 100%; border: 1px solid rgba(148, 178, 229, 0.22); border-radius: 3px; padding: 11px 12px; outline: none; resize: vertical; background: rgba(3, 8, 18, 0.7); color: var(--text); font: inherit; }
+.field input, .field textarea { width: 100%; border: 1px solid rgba(148, 178, 229, 0.22); border-radius: 3px; padding: 10px 11px; outline: none; resize: vertical; background: rgba(3, 8, 18, 0.72); color: var(--text); font: inherit; }
 .field input:focus, .field textarea:focus { border-color: #5fc8ff; box-shadow: 0 0 0 3px rgba(95, 200, 255, 0.12); }
 .checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .check-option { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.84rem; }
 .check-option input { width: auto; accent-color: #5aa9ff; }
 .form-error, .error { color: #ffb4b4; }
 .form-error { margin: 0; font-size: 0.88rem; }
-.sign-out { display: block; margin: 20px auto 0; border: 0; padding: 4px; cursor: pointer; background: transparent; color: #8190a8; font: inherit; font-size: 0.78rem; text-decoration: underline; text-underline-offset: 3px; }
+.sign-out { display: block; margin: 22px 0 0 auto; border: 0; padding: 4px; cursor: pointer; background: transparent; color: #8190a8; font: inherit; font-size: 0.78rem; text-decoration: underline; text-underline-offset: 3px; }
 .error { position: relative; z-index: 1; margin-top: 20px; }
 .site-footer { position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto; gap: 16px; margin-top: 110px; padding-block: 25px 30px; border-top: 1px solid rgba(159, 192, 245, 0.14); color: #6d7c94; font-size: 0.69rem; letter-spacing: 0.1em; text-transform: uppercase; }
 .legal-notice { grid-column: 1 / -1; max-width: 680px; margin: 9px 0 0; color: #71809a; font-size: 0.66rem; letter-spacing: 0.03em; line-height: 1.55; text-transform: none; }
@@ -1219,19 +1253,20 @@ h1 { max-width: 11ch; margin-bottom: 24px; font-size: clamp(4rem, 5.6vw, 5.45rem
 @media (max-width: 760px) {
   .content-width { width: min(100% - 40px, 520px); }
   .site-header { padding-block: 22px; }
-  .hero { display: flex; flex-direction: column; align-items: stretch; min-height: 0; padding-block: 52px 50px; }
+  .hero { display: flex; flex-direction: column; align-items: stretch; gap: 38px; min-height: 0; padding-block: 48px 50px; }
   h1 { max-width: 9ch; font-size: clamp(3.35rem, 15vw, 4.45rem); }
   .lede br { display: none; }
-  .hero-visual { order: 2; min-height: 370px; margin-top: 12px; }
-  .memory-rift { inset: 4% -7% 0; }
-  .rift-arc-one { left: -9%; }.rift-arc-two { right: -15%; }
+  .hero-side { width: 100%; }
+  .hero-visual { min-height: 360px; }
+  .hero-mark { width: min(78%, 300px); }
+  .orbit-one { width: 360px; height: 130px; }
+  .orbit-two { width: 330px; height: 110px; }
+  .beta-panel { width: 100%; margin: 0; padding: 28px 22px; }
+  .panel-state { min-height: 220px; }
   .values { display: block; border-bottom: 0; }
   .values article { min-height: 0; padding: 23px 0; }
   .values article + article { border-left: 0; border-top: 1px solid rgba(159, 192, 245, 0.14); padding-left: 0; }
   .value-number { margin-bottom: 12px; }
-  .beta-flow { padding-top: 58px; }
-  .request-section { display: block; padding: 28px 22px; }
-  .request-intro { margin-bottom: 32px; }
   .checkbox-grid { grid-template-columns: 1fr; }
   .site-footer { margin-top: 76px; font-size: 0.62rem; }
   .legal-notice { font-size: 0.62rem; }
@@ -1242,7 +1277,9 @@ h1 { max-width: 11ch; margin-bottom: 24px; font-size: clamp(4rem, 5.6vw, 5.45rem
   .private-beta { font-size: 0.58rem; }
   h1 { font-size: 3.2rem; }
   .button { width: 100%; }
-  .hero-visual { min-height: 330px; }
+  .hero-visual { min-height: 310px; }
+  .hero { gap: 28px; }
+  .beta-panel { margin-inline: -4px; width: calc(100% + 8px); padding: 25px 18px; }
   .site-footer { grid-template-columns: 1fr; }
 }
 </style>
