@@ -1198,10 +1198,10 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 .visual-starfield, .visual-horizon { position: absolute; inset: 0; pointer-events: none; }
 .visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.16), transparent 63%); }
 .visual-horizon { top: auto; bottom: 20px; height: 33%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.27), transparent 63%); filter: blur(12px); }
-.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); animation: hero-mark-white-pulse 8s ease-in-out infinite; }
+.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 20px rgba(83, 223, 255, 0.2)) drop-shadow(0 0 48px rgba(154, 107, 255, 0.1)); animation: hero-mark-white-pulse 8s ease-in-out infinite; }
 @keyframes hero-mark-white-pulse {
-  0%, 100% { filter: brightness(1) drop-shadow(0 0 22px rgba(83, 223, 255, 0.32)) drop-shadow(0 0 56px rgba(154, 107, 255, 0.18)); }
-  50% { filter: brightness(1.045) drop-shadow(0 0 23px rgba(255, 255, 255, 0.12)) drop-shadow(0 0 60px rgba(190, 216, 255, 0.16)); }
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 19px rgba(83, 223, 255, 0.16)) drop-shadow(0 0 44px rgba(154, 107, 255, 0.08)); }
+  50% { filter: brightness(1.03) drop-shadow(0 0 21px rgba(255, 255, 255, 0.1)) drop-shadow(0 0 48px rgba(220, 228, 255, 0.1)); }
 }
 .orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
 .orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); }
