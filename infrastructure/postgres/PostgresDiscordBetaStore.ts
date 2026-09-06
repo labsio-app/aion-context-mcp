@@ -63,6 +63,21 @@ export class PostgresDiscordBetaStore implements DiscordBetaStore {
     return mapIdentity(result.rows[0] as Record<string, unknown>)
   }
 
+  async getIdentityById(identityId: string): Promise<DiscordIdentityRecord | null> {
+    const result = await this.pool.query(
+      `SELECT id, discord_user_id, username, global_name, avatar, display_name, created_at, updated_at
+       FROM discord_identities
+       WHERE id = $1
+       LIMIT 1`,
+      [identityId]
+    )
+
+    const row = result.rows[0] as Record<string, unknown> | undefined
+    if (!row) return null
+
+    return mapIdentity(row)
+  }
+
   async createSession(input: {
     identityId: string
     tokenHash: string

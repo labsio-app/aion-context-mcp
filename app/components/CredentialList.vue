@@ -55,44 +55,43 @@ function formatTimestamp(value: string | null): string {
     <div v-if="loading" class="state" aria-live="polite">Loading credentials…</div>
     <div v-else-if="error" class="state error" role="alert">{{ error }}</div>
     <div v-else-if="!credentials.length" class="state empty">No MCP credential has been issued yet.</div>
-    <ul v-else class="credential-list">
-      <li v-for="credential in credentials" :key="credential.id" class="credential-row">
-        <div class="credential-main">
-          <strong>{{ credential.oauthClientId }}</strong>
-          <span>{{ credential.status }}</span>
-        </div>
-        <dl class="credential-meta">
-          <div>
-            <dt>Issued</dt>
-            <dd>{{ formatTimestamp(credential.issuedAt) }}</dd>
+    <div v-else class="credential-table">
+      <div class="credential-head">
+        <span>Credential</span>
+        <span>Status</span>
+        <span>Issued</span>
+        <span>Last used</span>
+        <span>Revoked</span>
+        <span>Action</span>
+      </div>
+      <ul class="credential-list">
+        <li v-for="credential in credentials" :key="credential.id" class="credential-row">
+          <div class="credential-main">
+            <strong>{{ credential.oauthClientId }}</strong>
           </div>
-          <div>
-            <dt>Last used</dt>
-            <dd>{{ formatTimestamp(credential.lastUsedAt) }}</dd>
-          </div>
-          <div>
-            <dt>Revoked</dt>
-            <dd>{{ formatTimestamp(credential.revokedAt) }}</dd>
-          </div>
-        </dl>
-        <button
-          class="button danger"
-          type="button"
-          :disabled="busyCredentialId === credential.id || credential.status !== 'ACTIVE'"
-          @click="emit('revoke', credential.id)"
-        >
-          {{ busyCredentialId === credential.id ? 'Revoking…' : 'Revoke' }}
-        </button>
-      </li>
-    </ul>
+          <div class="credential-status" :data-status="credential.status">{{ credential.status }}</div>
+          <div>{{ formatTimestamp(credential.issuedAt) }}</div>
+          <div>{{ formatTimestamp(credential.lastUsedAt) }}</div>
+          <div>{{ formatTimestamp(credential.revokedAt) }}</div>
+          <button
+            class="button danger"
+            type="button"
+            :disabled="busyCredentialId === credential.id || credential.status !== 'ACTIVE'"
+            @click="emit('revoke', credential.id)"
+          >
+            {{ busyCredentialId === credential.id ? 'Revoking…' : 'Revoke' }}
+          </button>
+        </li>
+      </ul>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .credential-card {
-  padding: 20px;
+  padding: 16px;
   border: 1px solid rgba(82, 239, 217, 0.16);
-  border-radius: 22px;
+  border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(11, 17, 32, 0.9), rgba(7, 11, 20, 0.94)),
     radial-gradient(circle at top left, rgba(82, 239, 217, 0.08), transparent 40%);
@@ -103,11 +102,11 @@ function formatTimestamp(value: string | null): string {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .state {
-  padding: 18px;
+  padding: 14px 16px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--aion-muted);
@@ -122,60 +121,58 @@ function formatTimestamp(value: string | null): string {
   border: 1px dashed rgba(82, 239, 217, 0.18);
 }
 
+.credential-table {
+  display: grid;
+  gap: 10px;
+}
+
+.credential-head {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.55fr) repeat(3, minmax(0, 0.8fr)) auto;
+  gap: 12px;
+  padding: 0 14px;
+  color: var(--aion-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .credential-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .credential-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.55fr) repeat(3, minmax(0, 0.8fr)) auto;
+  gap: 12px;
   align-items: center;
-  padding: 16px;
+  padding: 12px 14px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .credential-main {
-  display: grid;
-  gap: 4px;
-}
-
-.credential-main strong {
-  font-size: 0.95rem;
-}
-
-.credential-main span {
-  font-size: 0.8rem;
-  color: var(--aion-muted);
-}
-
-.credential-meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.credential-meta div {
   min-width: 0;
 }
 
-.credential-meta dt {
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+.credential-main strong {
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.credential-status {
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--aion-accent-2);
 }
 
-.credential-meta dd {
-  margin: 4px 0 0;
-  font-size: 0.82rem;
-  color: var(--aion-muted);
+.credential-status[data-status='REVOKED'] {
+  color: #ff8f9c;
 }
 
 @media (max-width: 900px) {
@@ -188,8 +185,8 @@ function formatTimestamp(value: string | null): string {
     grid-template-columns: 1fr;
   }
 
-  .credential-meta {
-    grid-template-columns: 1fr;
+  .credential-head {
+    display: none;
   }
 }
 </style>

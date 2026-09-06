@@ -79,6 +79,8 @@ export interface DiscordBetaStore {
     avatar: string | null
   }): Promise<DiscordIdentityRecord>
 
+  getIdentityById?(identityId: string): Promise<DiscordIdentityRecord | null>
+
   createSession(input: {
     identityId: string
     tokenHash: string

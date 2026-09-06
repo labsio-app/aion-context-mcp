@@ -9,6 +9,7 @@ import { PostgresDiscordBetaStore } from '../infrastructure/postgres/PostgresDis
 import { PostgresMcpCredentialStore } from '../infrastructure/postgres/PostgresMcpCredentialStore.js'
 import { getPool } from '../infrastructure/postgres/pool.js'
 import { createAionMcpServer } from './server.js'
+import { createMcpLogger } from './logger.js'
 import {
   authenticateMcpRequest,
   registerOAuthRoutes,
@@ -18,6 +19,7 @@ import {
 
 const host = process.env.MCP_HOST ?? '0.0.0.0'
 const port = Number(process.env.MCP_PORT ?? 3001)
+const logger = createMcpLogger('mcp')
 
 const allowedHosts = (process.env.MCP_ALLOWED_HOSTS ?? 'localhost,127.0.0.1')
   .split(',')
@@ -70,6 +72,14 @@ await registerOAuthRoutes(app, {
 app.addHook('onRequest', async (request, reply) => {
   if (!request.url.startsWith('/mcp')) return
 
+  const startedAt = performance.now()
+  ;(request.raw as any).__mcpStartedAt = startedAt
+  logger.debug('mcp_request_started', {
+    method: request.method,
+    url: request.url,
+    requestId: request.id
+  })
+
   const result = await authenticateMcpRequest(request, {
     credentialStore: mcpCredentialStore,
     betaAccessStore
@@ -77,20 +87,71 @@ app.addHook('onRequest', async (request, reply) => {
 
   if (result.kind !== 'authenticated') {
     if (result.kind === 'forbidden') {
+      logger.warn('mcp_auth_forbidden', {
+        method: request.method,
+        url: request.url,
+        requestId: request.id
+      })
       return sendMcpForbidden(reply)
     }
 
+    logger.info('mcp_auth_challenge', {
+      method: request.method,
+      url: request.url,
+      requestId: request.id
+    })
     return sendMcpAuthChallenge(reply)
   }
 
-  ;(request.raw as any).auth = result.principal as McpPrincipal
+  logger.debug('mcp_auth_authenticated', {
+    method: request.method,
+    url: request.url,
+    requestId: request.id,
+    principal: logger.principal(result.principal)
+  })
+  const identity = await discordStore.getIdentityById?.(result.principal.userId)
+  ;(request.raw as any).auth = {
+    principal: result.principal as McpPrincipal,
+    ...(identity ? { adminDiscordUserId: identity.discordUserId } : {})
+  }
 })
 
-const handler = createMcpHandler(({ authInfo }) =>
-  createAionMcpServer({ principal: authInfo as McpPrincipal | undefined })
-)
+app.addHook('onResponse', async (request, reply) => {
+  if (!request.url.startsWith('/mcp')) return
+
+  const startedAt = (request.raw as any).__mcpStartedAt as number | undefined
+  const durationMs =
+    typeof startedAt === 'number' ? Math.max(0, Math.round(performance.now() - startedAt)) : null
+
+  logger.info('mcp_request_completed', {
+    method: request.method,
+    url: request.url,
+    requestId: request.id,
+    statusCode: reply.statusCode,
+    durationMs
+  })
+})
+
+const handler = createMcpHandler(({ authInfo }) => {
+  const principal =
+    authInfo && typeof authInfo === 'object' && 'principal' in authInfo
+      ? (authInfo as { principal?: McpPrincipal }).principal
+      : (authInfo as McpPrincipal | undefined)
+  const adminDiscordUserId =
+    authInfo && typeof authInfo === 'object' && 'adminDiscordUserId' in authInfo
+      ? String((authInfo as { adminDiscordUserId?: unknown }).adminDiscordUserId ?? '')
+      : undefined
+
+  return createAionMcpServer({
+    principal,
+    adminDiscordUserId: adminDiscordUserId || undefined
+  })
+})
 const nodeHandler = toNodeHandler(handler, {
-  onerror: error => console.error('MCP adapter error', error)
+  onerror: error =>
+    logger.error('mcp_adapter_error', {
+      ...logger.errorDetails(error)
+    })
 })
 
 const buildInfo = getBuildInfo()
@@ -108,6 +169,12 @@ app.get('/health', async () => ({
 }))
 
 await app.listen({ host, port })
-console.log(
-  `AION MCP listening on http://${host}:${port}/mcp (${buildInfo.releaseTag} ${buildInfo.commitSha ?? 'local'})`
-)
+logger.info('mcp_server_started', {
+  host,
+  port,
+  endpoint: `http://${host}:${port}/mcp`,
+  releaseTag: buildInfo.releaseTag,
+  commitSha: buildInfo.commitSha ?? 'local',
+  version: buildInfo.version,
+  logLevel: logger.level
+})

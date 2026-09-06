@@ -10,7 +10,7 @@ import type {
   DiscordIdentityRecord
 } from '../../core/application/ports.js'
 import { InvalidBetaAccessTransitionError } from '../../core/application/InvalidBetaAccessTransitionError.js'
-import { resolveAuthenticatedDiscordIdentity } from './discord-beta.js'
+import { requireBetaAdminIdentity } from './admin-identity.js'
 
 export interface BetaAdminControllerDeps {
   application: BetaAdminApplication
@@ -27,42 +27,6 @@ function mapAdminIdentity(identity: DiscordIdentityRecord) {
 
 function mapRequest(record: BetaAccessReviewRecord) {
   return record
-}
-
-function parseAllowedDiscordIds(value: string): Set<string> {
-  return new Set(
-    value
-      .split(/[\s,]+/)
-      .map(entry => entry.trim())
-      .filter(Boolean)
-  )
-}
-
-async function requireBetaAdminIdentity(event: any, store: DiscordBetaStore) {
-  const identity = await resolveAuthenticatedDiscordIdentity(event, store)
-  if (!identity) {
-    throw createError({
-      statusCode: 401,
-      statusMessage: 'Unauthorized'
-    })
-  }
-
-  const allowed = parseAllowedDiscordIds(String(process.env.BETA_ADMIN_DISCORD_IDS ?? ''))
-  if (!allowed.size && process.env.NODE_ENV === 'production') {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'BETA_ADMIN_DISCORD_IDS is required in production'
-    })
-  }
-
-  if (!allowed.has(identity.discordUserId)) {
-    throw createError({
-      statusCode: 403,
-      statusMessage: 'Forbidden'
-    })
-  }
-
-  return identity
 }
 
 function parseFilter(value: unknown): BetaAccessReviewFilter {

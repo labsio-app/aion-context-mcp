@@ -57,6 +57,13 @@ interface AdminActionResponse {
   }
 }
 
+interface McpLogFileRecord {
+  name: string
+  sizeBytes: number
+  modifiedAt: string
+  downloadUrl: string
+}
+
 const filters: AdminFilter[] = ['PENDING', 'APPROVED', 'REJECTED', 'REVOKED', 'ALL']
 const filter = ref<AdminFilter>('PENDING')
 const admin = ref<AdminIdentity | null>(null)
@@ -70,6 +77,9 @@ const success = ref('')
 const accessDenied = ref(false)
 const decisionReason = ref('')
 const pendingDecision = ref<null | 'reject' | 'revoke'>(null)
+const mcpLogs = ref<McpLogFileRecord[]>([])
+const mcpLogsLoading = ref(false)
+const mcpLogsError = ref('')
 
 function setSelected(next: ReviewRecord | null) {
   selected.value = next
@@ -200,11 +210,45 @@ function cancelDecision() {
   pendingDecision.value = null
 }
 
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let index = 0
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024
+    index += 1
+  }
+  return `${index === 0 || value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[index]}`
+}
+
+async function loadMcpLogs() {
+  mcpLogsLoading.value = true
+  mcpLogsError.value = ''
+  try {
+    const payload = await $fetch<{ files: McpLogFileRecord[] }>('/api/admin/mcp-logs')
+    mcpLogs.value = payload.files
+  } catch (cause: any) {
+    const status = Number(cause?.statusCode ?? cause?.response?.status ?? cause?.data?.statusCode ?? 0)
+    if (status === 401 || status === 403) {
+      accessDenied.value = true
+      return
+    }
+
+    mcpLogsError.value = normalizeError(cause, 'Could not load MCP log files.')
+  } finally {
+    mcpLogsLoading.value = false
+  }
+}
+
 watch(filter, async () => {
   await loadRequests()
 })
 
-onMounted(loadRequests)
+onMounted(() => {
+  void loadRequests()
+  void loadMcpLogs()
+})
 </script>
 
 <template>
@@ -246,10 +290,44 @@ onMounted(loadRequests)
           </select>
         </label>
 
-        <button class="ghost" type="button" :disabled="loading" @click="loadRequests">
-          {{ loading ? 'Refreshing…' : 'Refresh' }}
-        </button>
+        <div class="toolbar-actions">
+          <button class="ghost" type="button" :disabled="loading" @click="loadRequests">
+            {{ loading ? 'Refreshing…' : 'Refresh' }}
+          </button>
+          <button class="ghost" type="button" :disabled="mcpLogsLoading" @click="loadMcpLogs">
+            {{ mcpLogsLoading ? 'Refreshing logs…' : 'Refresh logs' }}
+          </button>
+        </div>
       </div>
+
+      <section class="logs-panel">
+        <div class="panel-title">
+          <span>MCP logs</span>
+          <strong>{{ mcpLogs.length }}</strong>
+        </div>
+
+        <p class="logs-copy">
+          Structured JSONL files written on disk by the MCP server. Download them for debugging and
+          perf analysis.
+        </p>
+
+        <p v-if="mcpLogsError" class="notice error inline" role="alert">{{ mcpLogsError }}</p>
+        <div v-else-if="mcpLogsLoading" class="empty">Loading MCP log files…</div>
+        <div v-else-if="!mcpLogs.length" class="empty neutral">No MCP log files yet.</div>
+        <div v-else class="logs-list">
+          <a
+            v-for="file in mcpLogs"
+            :key="file.name"
+            class="log-row"
+            :href="file.downloadUrl"
+          >
+            <strong>{{ file.name }}</strong>
+            <span>{{ formatBytes(file.sizeBytes) }}</span>
+            <small>{{ file.modifiedAt }}</small>
+            <em>Download</em>
+          </a>
+        </div>
+      </section>
 
       <div class="grid">
         <aside class="list-panel">
@@ -500,6 +578,13 @@ onMounted(loadRequests)
   border-bottom: 1px solid rgba(159, 192, 245, 0.14);
 }
 
+.toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -547,6 +632,59 @@ onMounted(loadRequests)
 .primary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.logs-panel {
+  margin-bottom: 18px;
+  padding: 16px 0 18px;
+  border-top: 1px solid rgba(159, 192, 245, 0.14);
+  border-bottom: 1px solid rgba(159, 192, 245, 0.14);
+}
+
+.logs-copy {
+  margin: 8px 0 14px;
+  max-width: 72ch;
+  color: var(--aion-muted);
+  line-height: 1.55;
+}
+
+.notice.inline {
+  margin-bottom: 14px;
+}
+
+.logs-list {
+  display: grid;
+  gap: 8px;
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 220px auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(159, 192, 245, 0.12);
+  color: var(--aion-text);
+  text-decoration: none;
+}
+
+.log-row:last-child {
+  border-bottom: 0;
+}
+
+.log-row strong {
+  font-size: 0.98rem;
+}
+
+.log-row span,
+.log-row small,
+.log-row em {
+  color: var(--aion-muted);
+  font-style: normal;
+}
+
+.log-row em {
+  justify-self: end;
 }
 
 .grid {
@@ -701,6 +839,15 @@ onMounted(loadRequests)
     padding: 28px 0 0;
     border-top: 1px solid rgba(159, 192, 245, 0.16);
     border-left: 0;
+  }
+
+  .log-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .log-row em {
+    justify-self: start;
   }
 }
 

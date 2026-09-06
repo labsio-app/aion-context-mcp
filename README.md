@@ -65,6 +65,22 @@ There is no aggregate ceremony, event bus or CQRS in this POC.
 
 The MCP also exposes the `aion_researcher` prompt.
 
+## MCP logs
+
+The MCP server emits structured JSON logs for:
+
+- server startup;
+- MCP request start and completion;
+- OAuth auth results;
+- tool success/failure with duration;
+- activity-recording failures.
+
+The default level is `info`. Set `MCP_LOG_LEVEL=debug` to include request/auth debug events while keeping payloads and source content out of the logs.
+
+Log files are written as daily JSONL files under `MCP_LOG_DIR` and are shared between the web and MCP containers in Docker Compose. In the admin cockpit, they appear in the new “MCP logs” section where you can download each file directly.
+
+The MCP server also exposes an admin-only tool, `aion_read_mcp_logs`, for protocol-side inspection. It can list log files, read one file, or look up a specific event by its canonical `logId`. Use `logId` when you need to refer to one exact log entry across files.
+
 ## Why no vector database yet?
 
 For the first POC, the host model can reformulate and iterate search queries itself. PostgreSQL lexical retrieval keeps the infrastructure cheap and observable.

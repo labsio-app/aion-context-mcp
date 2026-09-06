@@ -53,9 +53,9 @@ const phrase = ref('')
 
 <style scoped>
 .danger-zone {
-  padding: 20px;
+  padding: 14px;
   border: 1px solid rgba(255, 96, 120, 0.24);
-  border-radius: 22px;
+  border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(33, 10, 18, 0.9), rgba(15, 8, 14, 0.96)),
     radial-gradient(circle at top left, rgba(255, 96, 120, 0.12), transparent 46%);
@@ -64,7 +64,7 @@ const phrase = ref('')
 .danger-header {
   display: grid;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .danger-copy {

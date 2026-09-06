@@ -51,6 +51,7 @@ services:
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
       NUXT_PUBLIC_RELEASE_TAG: ${APP_RELEASE_TAG:-v0.1.0}
       NUXT_PUBLIC_COMMIT_SHA: ${APP_COMMIT_SHA:-}
+      MCP_LOG_DIR: ${MCP_LOG_DIR:-/var/log/aion-context-mcp}
       NITRO_HOST: 0.0.0.0
       NITRO_PORT: 3000
     ports:
@@ -60,6 +61,8 @@ services:
         condition: service_completed_successfully
     secrets:
       - postgres_password
+    volumes:
+      - aion_mcp_logs:/var/log/aion-context-mcp
 
   mcp:
     build: .
@@ -78,6 +81,7 @@ services:
       MCP_OAUTH_JWT_SECRET: ${MCP_OAUTH_JWT_SECRET:-}
       APP_RELEASE_TAG: ${APP_RELEASE_TAG:-}
       APP_COMMIT_SHA: ${APP_COMMIT_SHA:-}
+      MCP_LOG_DIR: ${MCP_LOG_DIR:-/var/log/aion-context-mcp}
       MCP_HOST: ${MCP_HOST:-0.0.0.0}
       MCP_PORT: ${MCP_PORT:-3001}
       MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
@@ -89,6 +93,8 @@ services:
         condition: service_completed_successfully
     secrets:
       - postgres_password
+    volumes:
+      - aion_mcp_logs:/var/log/aion-context-mcp
 
   worker:
     build: .
@@ -112,6 +118,7 @@ services:
 
 volumes:
   aion_postgres:
+  aion_mcp_logs:
 
 secrets:
   postgres_password:

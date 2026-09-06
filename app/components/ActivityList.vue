@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+
 interface ActivityItem {
   id: string
   createdAt: string
@@ -18,13 +20,15 @@ const props = withDefaults(
     error?: string
     emptyMessage?: string
     compact?: boolean
+    maxVisible?: number
   }>(),
   {
     description: '',
     loading: false,
     error: '',
     emptyMessage: 'No activity yet.',
-    compact: false
+    compact: false,
+    maxVisible: undefined
   }
 )
 
@@ -36,6 +40,27 @@ function formatDuration(value: number | null): string {
   if (value == null) return '—'
   return `${value} ms`
 }
+
+const showAll = ref(false)
+
+const visibleItems = computed(() => {
+  if (!props.maxVisible || showAll.value || props.items.length <= props.maxVisible) {
+    return props.items
+  }
+
+  return props.items.slice(0, props.maxVisible)
+})
+
+const canToggle = computed(
+  () => Boolean(props.maxVisible) && props.items.length > (props.maxVisible ?? 0)
+)
+
+watch(
+  () => props.items,
+  () => {
+    showAll.value = false
+  }
+)
 </script>
 
 <template>
@@ -51,35 +76,42 @@ function formatDuration(value: number | null): string {
     <div v-if="loading" class="state" aria-live="polite">Loading activity…</div>
     <div v-else-if="error" class="state error" role="alert">{{ error }}</div>
     <div v-else-if="!items.length" class="state empty">{{ emptyMessage }}</div>
-    <ul v-else class="activity-list" :class="{ compact }">
-      <li v-for="item in items" :key="item.id" class="activity-row">
-        <div class="activity-timestamp">{{ formatTimestamp(item.createdAt) }}</div>
-        <div class="activity-main">
-          <strong>{{ item.toolName }}</strong>
-          <span class="activity-meta">
-            {{ item.outcome }}
-            <template v-if="item.credentialLabel || item.credentialId">
-              <span class="dot" aria-hidden="true">·</span>
-              <span>
-                {{
-                  item.credentialLabel ??
-                  (item.credentialId ? `credential ${item.credentialId.slice(0, 8)}` : 'credential unavailable')
-                }}
-              </span>
-            </template>
-          </span>
-        </div>
-        <div class="activity-duration">{{ formatDuration(item.durationMs) }}</div>
-      </li>
-    </ul>
+    <div v-else class="activity-table">
+      <div class="activity-head" :class="{ compact }">
+        <span>Time</span>
+        <span>Tool</span>
+        <span>Result</span>
+        <span>Duration</span>
+      </div>
+      <ul class="activity-list" :class="{ compact }">
+        <li v-for="item in visibleItems" :key="item.id" class="activity-row">
+          <div class="activity-timestamp">{{ formatTimestamp(item.createdAt) }}</div>
+          <div class="activity-main">
+            <strong>{{ item.toolName }}</strong>
+            <span v-if="item.credentialLabel || item.credentialId" class="activity-meta">
+              {{
+                item.credentialLabel ??
+                (item.credentialId ? `credential ${item.credentialId.slice(0, 8)}` : 'credential unavailable')
+              }}
+            </span>
+          </div>
+          <div class="activity-result" :data-outcome="item.outcome">{{ item.outcome }}</div>
+          <div class="activity-duration">{{ formatDuration(item.durationMs) }}</div>
+        </li>
+      </ul>
+
+      <button v-if="canToggle" class="activity-toggle" type="button" @click="showAll = !showAll">
+        {{ showAll ? 'Show less' : `Show more (${items.length - visibleItems.length})` }}
+      </button>
+    </div>
   </section>
 </template>
 
 <style scoped>
 .activity-card {
-  padding: 20px;
+  padding: 16px;
   border: 1px solid rgba(82, 239, 217, 0.16);
-  border-radius: 22px;
+  border-radius: 20px;
   background:
     linear-gradient(180deg, rgba(11, 17, 32, 0.9), rgba(7, 11, 20, 0.94)),
     radial-gradient(circle at top left, rgba(56, 165, 255, 0.08), transparent 40%);
@@ -90,20 +122,20 @@ function formatDuration(value: number | null): string {
   align-items: end;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .activity-description {
   max-width: 32ch;
   margin: 0;
   color: var(--aion-muted);
-  font-size: 0.86rem;
+  font-size: 0.82rem;
   line-height: 1.5;
   text-align: right;
 }
 
 .state {
-  padding: 18px;
+  padding: 14px 16px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
   color: var(--aion-muted);
@@ -118,6 +150,22 @@ function formatDuration(value: number | null): string {
   border: 1px dashed rgba(82, 239, 217, 0.18);
 }
 
+.activity-table {
+  display: grid;
+  gap: 10px;
+}
+
+.activity-head {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr) 112px 76px;
+  gap: 12px;
+  padding: 0 14px;
+  color: var(--aion-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 .activity-list {
   list-style: none;
   margin: 0;
@@ -128,16 +176,16 @@ function formatDuration(value: number | null): string {
 
 .activity-row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 96px;
+  grid-template-columns: 128px minmax(0, 1fr) 112px 76px;
   gap: 12px;
   align-items: center;
-  padding: 14px 16px;
+  padding: 11px 14px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.03);
 }
 
 .activity-list.compact .activity-row {
-  padding-block: 12px;
+  padding-block: 10px;
 }
 
 .activity-timestamp,
@@ -153,19 +201,36 @@ function formatDuration(value: number | null): string {
 }
 
 .activity-main strong {
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-weight: 700;
 }
 
 .activity-meta {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  overflow-wrap: anywhere;
 }
 
-.dot {
+.activity-result {
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--aion-accent-2);
+}
+
+.activity-result[data-outcome='FAILURE'] {
+  color: #ff8f9c;
+}
+
+.activity-toggle {
+  justify-self: start;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--aion-accent-2);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 @media (max-width: 800px) {
@@ -181,6 +246,10 @@ function formatDuration(value: number | null): string {
   .activity-row {
     grid-template-columns: 1fr;
     gap: 8px;
+  }
+
+  .activity-head {
+    display: none;
   }
 }
 </style>

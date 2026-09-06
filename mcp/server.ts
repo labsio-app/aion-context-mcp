@@ -5,7 +5,13 @@ import { KnowledgeApplication } from '../core/application/KnowledgeApplication.j
 import { RecordMcpActivity } from '../core/application/RecordMcpActivity.js'
 import type { McpPrincipal } from '../core/application/McpPrincipal.js'
 import { getContainer } from '../infrastructure/container.js'
+import {
+  findMcpLogEntry,
+  listMcpLogFiles,
+  readMcpLogFileEntries
+} from '../infrastructure/mcp-log-files.js'
 import { getBuildInfo } from '../infrastructure/version.js'
+import { createMcpLogger } from './logger.js'
 import {
   confidenceLevels,
   gameScopes,
@@ -60,6 +66,8 @@ Epistemic rules:
 - When evidence conflicts with Knowledge, preserve the existing item and record a Challenge with aion_record_challenge. Never silently overwrite history.
 
 When new material arrives, record or enqueue its Source first, preserve provenance and scope, extract only durable observations or claims, compare with existing Knowledge, then record Knowledge or a Challenge as appropriate. Do not convert an entire source into unquestioned Knowledge.
+
+If you have admin access, a dedicated log inspection tool is available. Log entries include canonical logId values for reference; use them to inspect request flow, tool timings and failures without treating the logs as ground truth.
 `.trim()
 
 const researcherPrompt = `${serverInstructions}
@@ -69,6 +77,7 @@ Use the MCP as contextual memory, not as an oracle.
 
 export interface AionMcpServerDependencies {
   principal?: McpPrincipal
+  adminDiscordUserId?: string
   knowledge?: Pick<
     KnowledgeApplication,
     'searchContext' | 'getSource' | 'recordSource' | 'recordKnowledge' | 'recordChallenge' | 'listChallenges'
@@ -81,8 +90,26 @@ function normalizeActivityDuration(startedAt: number): number {
   return Math.max(0, Math.round(performance.now() - startedAt))
 }
 
+function parseAdminDiscordIds(value: string): Set<string> {
+  return new Set(
+    value
+      .split(/[\s,]+/)
+      .map(entry => entry.trim())
+      .filter(Boolean)
+  )
+}
+
+function isAdminMcpPrincipal(principal?: McpPrincipal, adminDiscordUserId?: string): boolean {
+  if (!principal?.userId) return false
+  const allowed = parseAdminDiscordIds(String(process.env.BETA_ADMIN_DISCORD_IDS ?? ''))
+  if (!allowed.size) return false
+
+  return allowed.has(adminDiscordUserId ?? principal.userId)
+}
+
 async function recordActivityBestEffort(
   activity: Pick<RecordMcpActivity, 'execute'>,
+  logger: ReturnType<typeof createMcpLogger>,
   input: {
     principal: McpPrincipal
     toolName: string
@@ -98,11 +125,61 @@ async function recordActivityBestEffort(
       durationMs: input.durationMs
     })
   } catch (error) {
-    console.error('MCP activity recording failed', {
+    logger.error('mcp_activity_recording_failed', {
       toolName: input.toolName,
       outcome: input.outcome,
-      error: error instanceof Error ? error.message : String(error)
+      ...logger.errorDetails(error)
     })
+  }
+}
+
+export async function executeTrackedToolCall(
+  input: {
+    principal?: McpPrincipal
+    activity: Pick<RecordMcpActivity, 'execute'>
+    logger: ReturnType<typeof createMcpLogger>
+    toolName: string
+    handler: (input: any) => Promise<unknown>
+    input: any
+  }
+): Promise<unknown> {
+  const startedAt = performance.now()
+  try {
+    const result = await input.handler(input.input)
+    if (input.principal) {
+      await recordActivityBestEffort(input.activity, input.logger, {
+        principal: input.principal,
+        toolName: input.toolName,
+        outcome: 'SUCCESS',
+        durationMs: normalizeActivityDuration(startedAt)
+      })
+    }
+    input.logger.info('mcp_tool_call_completed', {
+      toolName: input.toolName,
+      outcome: 'SUCCESS',
+      durationMs: normalizeActivityDuration(startedAt),
+      principal: input.logger.principal(input.principal)
+    })
+    return result
+  } catch (error) {
+    if (input.principal) {
+      await recordActivityBestEffort(input.activity, input.logger, {
+        principal: input.principal,
+        toolName: input.toolName,
+        outcome: 'FAILURE',
+        durationMs: normalizeActivityDuration(startedAt)
+      })
+    }
+
+    input.logger.warn('mcp_tool_call_failed', {
+      toolName: input.toolName,
+      outcome: 'FAILURE',
+      durationMs: normalizeActivityDuration(startedAt),
+      principal: input.logger.principal(input.principal),
+      ...input.logger.errorDetails(error)
+    })
+
+    throw error
   }
 }
 
@@ -112,36 +189,37 @@ function registerTrackedTool(
     principal?: McpPrincipal
     activity: Pick<RecordMcpActivity, 'execute'>
   },
+  logger: ReturnType<typeof createMcpLogger>,
   name: string,
   config: any,
   handler: (input: any) => Promise<unknown>
 ) {
-  ;(server.registerTool as any)(name, config, async (input: any) => {
-    const startedAt = performance.now()
-    try {
-      const result = await handler(input)
-      if (context.principal) {
-        await recordActivityBestEffort(context.activity, {
-          principal: context.principal,
-          toolName: name,
-          outcome: 'SUCCESS',
-          durationMs: normalizeActivityDuration(startedAt)
-        })
-      }
-      return result
-    } catch (error) {
-      if (context.principal) {
-        await recordActivityBestEffort(context.activity, {
-          principal: context.principal,
-          toolName: name,
-          outcome: 'FAILURE',
-          durationMs: normalizeActivityDuration(startedAt)
-        })
-      }
+  ;(server.registerTool as any)(name, config, async (input: any) =>
+    executeTrackedToolCall({
+      principal: context.principal,
+      activity: context.activity,
+      logger,
+      toolName: name,
+      handler,
+      input
+    })
+  )
+}
 
-      throw error
-    }
-  })
+function registerAdminOnlyTool(
+  server: McpServer,
+  context: {
+    principal?: McpPrincipal
+    adminDiscordUserId?: string
+    activity: Pick<RecordMcpActivity, 'execute'>
+  },
+  logger: ReturnType<typeof createMcpLogger>,
+  name: string,
+  config: any,
+  handler: (input: any) => Promise<unknown>
+) {
+  if (!isAdminMcpPrincipal(context.principal, context.adminDiscordUserId)) return
+  registerTrackedTool(server, context, logger, name, config, handler)
 }
 
 export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
@@ -149,6 +227,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   const knowledge = deps.knowledge ?? container.knowledge
   const acquisition = deps.acquisition ?? container.acquisition
   const activity = deps.activity ?? container.activity
+  const logger = createMcpLogger('mcp-server')
   const buildInfo = getBuildInfo()
   const server = new McpServer({
     name: 'aion-context',
@@ -162,6 +241,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_search_context',
     withOAuthSecurity({
       title: 'Search AION context',
@@ -179,6 +259,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_get_source',
     withOAuthSecurity({
       title: 'Get AION source',
@@ -196,6 +277,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_record_source',
     withOAuthSecurity({
       title: 'Record AION source',
@@ -216,6 +298,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_record_knowledge',
     withOAuthSecurity({
       title: 'Record AION knowledge',
@@ -238,6 +321,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_record_challenge',
     withOAuthSecurity({
       title: 'Challenge AION knowledge',
@@ -255,6 +339,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_list_open_challenges',
     withOAuthSecurity({
       title: 'List open AION challenges',
@@ -269,6 +354,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_enqueue_source',
     withOAuthSecurity({
       title: 'Queue AION source acquisition',
@@ -310,6 +396,7 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
   registerTrackedTool(
     server,
     { principal: deps.principal, activity },
+    logger,
     'aion_get_server_info',
     withOAuthSecurity({
       title: 'Get AION server info',
@@ -317,6 +404,65 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
       inputSchema: z.object({})
     }),
     async () => jsonResult(buildInfoResult())
+  )
+
+  registerAdminOnlyTool(
+    server,
+    { principal: deps.principal, adminDiscordUserId: deps.adminDiscordUserId, activity },
+    logger,
+    'aion_read_mcp_logs',
+    withOAuthSecurity({
+      title: 'Read MCP logs',
+      description:
+        'ADMIN ONLY. List daily log files, inspect one file, or look up an event by canonical logId. Use this to analyze MCP request flow, timings and failures.',
+      inputSchema: z.object({
+        fileName: z.string().trim().optional(),
+        logId: z.string().trim().optional(),
+        limit: z.number().int().min(1).max(500).optional()
+      })
+    }),
+    async input => {
+      const fileName = typeof input?.fileName === 'string' ? input.fileName.trim() : ''
+      const logId = typeof input?.logId === 'string' ? input.logId.trim() : ''
+      const limit = typeof input?.limit === 'number' ? Math.max(1, Math.min(500, Math.round(input.limit))) : 100
+
+      if (logId) {
+        const match = await findMcpLogEntry(logId)
+        return jsonResult(
+          match
+            ? {
+                mode: 'ENTRY',
+                match,
+                limit
+              }
+            : {
+                mode: 'ENTRY',
+                match: null,
+                limit,
+                error: 'log_entry_not_found',
+                logId
+              }
+        )
+      }
+
+      if (fileName) {
+        const entries = await readMcpLogFileEntries(fileName)
+        const slice = entries.slice(Math.max(0, entries.length - limit))
+        return jsonResult({
+          mode: 'FILE',
+          fileName,
+          count: entries.length,
+          returned: slice.length,
+          entries: slice,
+          truncated: slice.length < entries.length
+        })
+      }
+
+      return jsonResult({
+        mode: 'LIST',
+        files: await listMcpLogFiles('/api/admin/mcp-logs')
+      })
+    }
   )
 
   return server
