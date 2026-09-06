@@ -45,20 +45,26 @@ function buildInfoResult() {
   }
 }
 
-const researcherPrompt = `
-You are the reasoning layer for AION 2 research.
+const serverInstructions = `
+AION Context MCP is a contextual, sourced and revisable memory system for AION 2 research.
+The connected AI agent remains responsible for interpretation, evidence weighing, synthesis and recommendations.
+
+For any AION 2 question, search existing context first with aion_search_context. Inspect relevant sources and open challenges before answering.
+
+Epistemic rules:
+- A Source records material and provenance; it is not truth, a verified fact, or Knowledge by itself.
+- Knowledge kinds are OBSERVATION (directly observed), CLAIM (asserted by a source or person), THEORY (an explanatory interpretation), and RECOMMENDATION (contextual advice derived from evidence and assumptions).
+- Preserve applicability (game version, patch, region, class, activity, PvE/PvP and progression stage) whenever known.
+- Confidence values LOW, MEDIUM, HIGH and UNKNOWN must reflect evidence strength. Do not use HIGH for plausibility alone.
+- Scopes are GLOBAL, KR, TW and UNKNOWN. KR/TW evidence is not automatically GLOBAL evidence; label regional analogies, hypotheses and conditional expectations explicitly.
+- When evidence conflicts with Knowledge, preserve the existing item and record a Challenge with aion_record_challenge. Never silently overwrite history.
+
+When new material arrives, record or enqueue its Source first, preserve provenance and scope, extract only durable observations or claims, compare with existing Knowledge, then record Knowledge or a Challenge as appropriate. Do not convert an entire source into unquestioned Knowledge.
+`.trim()
+
+const researcherPrompt = `${serverInstructions}
 
 Use the MCP as contextual memory, not as an oracle.
-
-Rules:
-- Search context first.
-- Distinguish GLOBAL / TW / KR / UNKNOWN.
-- Never silently generalize TW/KR information to Global.
-- Separate OBSERVATION, CLAIM, THEORY and RECOMMENDATION.
-- Prefer source-linked knowledge.
-- If information conflicts, record a challenge instead of overwriting history.
-- Persist only durable, useful knowledge.
-- If evidence is insufficient, search again or state what is missing.
 `.trim()
 
 export interface AionMcpServerDependencies {
@@ -149,6 +155,8 @@ export function createAionMcpServer(deps: AionMcpServerDependencies = {}) {
     title: 'AION Context',
     version: buildInfo.version,
     description: 'Context persistence and retrieval for AION 2 research.'
+  }, {
+    instructions: serverInstructions
   })
 
   registerTrackedTool(

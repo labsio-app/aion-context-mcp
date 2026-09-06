@@ -200,7 +200,9 @@ The active release is visible in the MCP server info tool and in `GET /health`.
 
 ## AI host instructions
 
-Use `prompts/aion-researcher.md` as project/system instructions in the AI host.
+The MCP advertises its core reasoning playbook through the standard server-level `instructions` field, so a fresh compatible client can discover the workflow during initialization. `prompts/aion-researcher.md` remains a portable host prompt for clients that want an explicit copy.
+
+See [`docs/aion-mcp-usage.md`](docs/aion-mcp-usage.md) for the agent workflow, source-ingestion and contradiction practices, plus user-facing examples.
 The source corpus lives in [`references/`](references/README.md).
 See also [docs/metier.md](docs/metier.md) for the product and business rules.
 
