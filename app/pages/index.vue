@@ -1198,7 +1198,11 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
 .visual-starfield, .visual-horizon { position: absolute; inset: 0; pointer-events: none; }
 .visual-starfield { background: radial-gradient(circle at 15% 30%, rgba(203, 239, 255, 0.8) 0 1px, transparent 1.5px), radial-gradient(circle at 64% 13%, rgba(203, 239, 255, 0.55) 0 1px, transparent 1.5px), radial-gradient(circle at 88% 57%, rgba(203, 239, 255, 0.6) 0 1px, transparent 1.5px), radial-gradient(circle at 29% 74%, rgba(203, 239, 255, 0.5) 0 1px, transparent 1.5px), radial-gradient(ellipse at center, rgba(66, 118, 255, 0.16), transparent 63%); }
 .visual-horizon { top: auto; bottom: 20px; height: 33%; background: radial-gradient(ellipse at 50% 100%, rgba(72, 166, 255, 0.27), transparent 63%); filter: blur(12px); }
-.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); }
+.hero-mark { position: absolute; top: 50%; left: 53%; width: min(64%, 360px); height: auto; transform: translate(-50%, -50%); filter: drop-shadow(0 0 24px rgba(83, 223, 255, 0.38)) drop-shadow(0 0 64px rgba(154, 107, 255, 0.24)); animation: hero-mark-breathe 14s ease-in-out infinite; will-change: filter; }
+@keyframes hero-mark-breathe {
+  0%, 100% { filter: drop-shadow(0 0 23px rgba(83, 223, 255, 0.34)) drop-shadow(0 0 60px rgba(154, 107, 255, 0.2)); }
+  50% { filter: drop-shadow(0 0 27px rgba(83, 223, 255, 0.42)) drop-shadow(0 0 68px rgba(154, 107, 255, 0.25)); }
+}
 .orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
 .orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); }
 .orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); }
@@ -1267,5 +1271,9 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
   .hero { gap: 28px; }
   .beta-panel { margin-inline: -4px; width: calc(100% + 8px); padding: 25px 18px; }
   .site-footer { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-mark { animation: none; }
 }
 </style>
