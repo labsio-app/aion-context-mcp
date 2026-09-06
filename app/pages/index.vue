@@ -1204,11 +1204,19 @@ h1 { max-width: 12ch; margin-bottom: 24px; font-size: clamp(3.7rem, 5.2vw, 5.15r
   50% { opacity: 1; filter: blur(17px) hue-rotate(28deg); }
 }
 .orbit { position: absolute; top: 50%; left: 53%; border: 1px solid rgba(121, 190, 255, 0.2); border-radius: 50%; pointer-events: none; }
-.orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); animation: orbit-glow 16s ease-in-out infinite; }
-.orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); animation: orbit-glow 16s ease-in-out 5s infinite reverse; }
-@keyframes orbit-glow {
-  0%, 100% { opacity: 0.42; }
-  50% { opacity: 1; }
+.orbit-one { width: 470px; height: 170px; transform: translate(-50%, -50%) rotate(-17deg); animation: orbit-sweep-one 24s linear infinite; }
+.orbit-two { width: 420px; height: 142px; transform: translate(-50%, -50%) rotate(28deg); border-color: rgba(133, 107, 255, 0.22); animation: orbit-sweep-two 29s linear infinite; }
+@keyframes orbit-sweep-one {
+  0% { opacity: 0.38; transform: translate(-50%, -50%) rotate(-17deg); box-shadow: 0 0 0 rgba(83, 223, 255, 0); }
+  25% { opacity: 0.82; box-shadow: 0 0 16px rgba(83, 223, 255, 0.18); }
+  50% { opacity: 0.52; transform: translate(-50%, -50%) rotate(73deg); box-shadow: 0 0 5px rgba(83, 223, 255, 0.08); }
+  75% { opacity: 0.94; box-shadow: 0 0 18px rgba(83, 223, 255, 0.22); }
+  100% { opacity: 0.38; transform: translate(-50%, -50%) rotate(343deg); box-shadow: 0 0 0 rgba(83, 223, 255, 0); }
+}
+@keyframes orbit-sweep-two {
+  0% { opacity: 0.32; transform: translate(-50%, -50%) rotate(28deg); box-shadow: 0 0 0 rgba(154, 107, 255, 0); }
+  50% { opacity: 0.82; transform: translate(-50%, -50%) rotate(-62deg); box-shadow: 0 0 17px rgba(154, 107, 255, 0.2); }
+  100% { opacity: 0.32; transform: translate(-50%, -50%) rotate(-332deg); box-shadow: 0 0 0 rgba(154, 107, 255, 0); }
 }
 .particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #e7fcff; box-shadow: 0 0 15px 4px rgba(96, 212, 255, 0.62); }
 .particle-one { top: 20%; left: 22%; animation: particle-shimmer 7s ease-in-out infinite; }
